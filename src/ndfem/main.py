@@ -1,29 +1,43 @@
+from abc import ABCMeta
 from collections.abc import Mapping, Sequence
 from typing import Callable, Protocol
 
 import attrs
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
-from .simplex import barycentric_to_cartesian
+from .simplex import barycentric_to_cartesian, reference_simplex
 
 class DataProtocol[TArray: Array](Protocol):
-    def v(self, derv: int) -> TArray: ...
+    def v(self, derv: int) -> TArray:
+        """
+        Returns the basis functions evaluated at x for a polynomial of degree k.
+
+        Parameters
+        ----------
+        derv : int
+            The drivative order of the basis functions.
+            
+        Returns
+        -------
+        TArray
+            The basis functions evaluated at x.
+        """
+        ...
 
     @property
     def x(self) -> TArray: ...
 
 
 class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
-    def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
+    def u(self, derv: int) -> TArray:
         """
         Returns the basis functions evaluated at x for a polynomial of degree k.
 
         Parameters
         ----------
-        derv : Sequence[tuple[int, int]]
-            (i, j) where returns the j-th derivative
-            of the i-th coordinate.
-
+        derv : int
+            The drivative order of the basis functions.
+            
         Returns
         -------
         TArray
@@ -33,7 +47,7 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
         ...
 
 
-class ElementProtocol[TArray: Array](Protocol):
+class ElementProtocol[TArray: Array, TBC: str](Protocol):
     def __call__(self, x: TArray, derv: Sequence[tuple[int, int]], /) -> TArray:
         """
         Evaluate the element at x with derivatives specified by derv.
@@ -57,20 +71,16 @@ class ElementProtocol[TArray: Array](Protocol):
 
         """
         ...
+        
+    # def essentical_bc(
+    #     self, bc: Mapping[TBC, TArray], /
+    # ) -> TArray:
+    #     ...
+        
 
+def par
+    
 
-@attrs.frozen(kw_only=True)
-class Data[TElement: ElementProtocol, TArray: Array](DataProtocol[TArray]):
-    element: TElement
-    simplex: TArray
-    x_barycentric: TArray
-
-    @property
-    def x(self) -> TArray:
-        return barycentric_to_cartesian(self.x_barycentric, self.simplex)
-
-    def v(self, derv: int) -> TArray:
-        return self.element(self.x_barycentric, [(0, derv)])
 
 
 @attrs.frozen(kw_only=True)
@@ -78,24 +88,26 @@ class BilinearData[TElement: ElementProtocol, TArray: Array](
     BilinearDataProtocol[TArray]
 ):
     element: TElement
-    simplex: TArray
+    simplex_vertices: TArray
+    """The vertices of the mesh of shape (n_vertices, d, d + 1)."""
     x_barycentric: TArray
+    """The integration points in barycentric coordinates of shape (n_points, d + 1)."""
     
     @property
     def x(self) -> TArray:
-        return barycentric_to_cartesian(self.x_barycentric, self.simplex)
+        return barycentric_to_cartesian(self.x_barycentric, self.simplex_vertices)
+
+    def _funcs(self, derv: int) -> TArray:
+        xp = array_namespace(self.x_barycentric, self.simplex_vertices)
+        funcs = self.element(self.x_barycentric, derv)[None, :]
+        mat = self.simplex_vertices[:, :, 1:] - self.simplex_vertices[:, :, 0:1]
+        return funcs @ xp.linalg.matrix_power(mat, derv)
 
     def v(self, derv: int) -> TArray:
-        return self.element(self.x_barycentric, [(0, derv)])[None, :]
+        return self._funcs(derv)[None, :]
 
-    def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
-        return self.element(self.x_barycentric, derv)[:, None]
-
-
-# def pk_element[TArray: Array](x: TArray, k: int) -> TArray:
-#     """Returns the basis functions evaluated at x for a polynomial of degree k.
-#     """
-#     n = x.shape[-1]
+    def u(self, derv: int) -> TArray:
+        return self._funcs(derv)[:, None]
 
 
 def fem[TArray: Array, TBC: str](
@@ -104,7 +116,7 @@ def fem[TArray: Array, TBC: str](
     bilinear_form: Callable[[BilinearDataProtocol[TArray]], TArray],
     linear_form: Callable[[DataProtocol[TArray]], TArray],
     element: ElementProtocol[TArray] | None = None,
-    essential_bc: Mapping[TBC, TArray] | None = None,
+    # essential_bc: Mapping[TBC, TArray] | None = None,
 ) -> TArray:
     """
     Finite element method for a triangle mesh.
