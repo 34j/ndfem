@@ -1,7 +1,6 @@
 from typing import Callable, Protocol
 
 from array_api._2024_12 import Array
-from array_api_compat import array_namespace
 
 
 class Data[TArray: Array](Protocol):
@@ -34,8 +33,6 @@ class BilinearData[TArray: Array](Data[TArray], Protocol):
 #     """Returns the basis functions evaluated at x for a polynomial of degree k.
 #     """
 #     n = x.shape[-1]
-
-
 
 
 def fem[TArray: Array](
