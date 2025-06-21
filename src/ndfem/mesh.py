@@ -15,7 +15,7 @@ class MeshProtocol[TArray: Array](Protocol):
     vertices : TArray
         The vertices of the mesh of shape (n_vertices, d).
     simplex : TArray
-        The indices of the vertices that form simplex of shape (n_simpex, d).
+        The indices of the vertices that form simplex of shape (n_simpex, d + 1).
 
     """
 
@@ -25,7 +25,7 @@ class MeshProtocol[TArray: Array](Protocol):
 
     @property
     def simplex(self) -> TArray:
-        """The indices of the vertices that form simplex of shape (n_simpex, d)."""
+        """The indices of the vertices that form simplex of shape (n_simpex, d + 1)."""
 
 
 @attrs.frozen(kw_only=True)
@@ -38,9 +38,9 @@ class Mesh[TArray: Array](MeshProtocol[TArray]):
             raise ValueError("Vertices must be a 2D array.")
         if self.simplex.ndim != 2:
             raise ValueError("Simplex must be a 2D array.")
-        if self.simplex.shape[1] != self.vertices.shape[1]:
+        if self.simplex.shape[1] != self.vertices.shape[1] + 1:
             raise ValueError(
-                "Simplex must have the same number of dimensions as vertices."
+                f"simplex.shape[1]={self.simplex.shape[1]} != vertices.shape[1]={self.vertices.shape[1]} + 1"
             )
 
 
@@ -106,7 +106,7 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
             )
         ),
         (n, -1),
-    )
+    ).T
     vertice_indices_start = xp.nonzero(
         xp.all(
             xp.reshape(
@@ -130,9 +130,35 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
             axis=0,
         )
     )[0]
+    print(vertice_indices_start)
     simplexes = xp.reshape(
         traiangulate_cube(len(lengths), stride=nums)[None, ...]
         + vertice_indices_start[:, None, None],
-        shape=(-1, n),
+        shape=(-1, n + 1),
     )
     return Mesh(vertices=vertices, simplex=simplexes)
+
+
+def simplex_planes[TArray: Array](simplex: TArray, /) -> TArray:
+    """
+    Convert a mesh to a triangle mesh.
+
+    Parameters
+    ----------
+    simplex : TArray
+        The indices of the vertices that form simplex of shape (n_simplex, d + 1).
+
+    Returns
+    -------
+    TArray
+        The triangle mesh of shape (n_triangles, d).
+
+    """
+    xp = array_namespace(simplex)
+    d = simplex.shape[1] - 1
+    simplex_planes = simplex[
+        :, (xp.arange(d + 1)[:, None] + xp.arange(d)[None, :]) % (d + 1)
+    ]
+    simplex_planes = xp.reshape(simplex_planes, (-1, d))
+    simplex_planes = np.unique(simplex_planes, axis=0)
+    return simplex_planes
