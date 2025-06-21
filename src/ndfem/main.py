@@ -1,11 +1,12 @@
-from abc import ABCMeta
-from collections.abc import Mapping, Sequence
-from typing import Callable, Protocol
+from collections.abc import Mapping
+from typing import Callable, Literal, Protocol
 
 import attrs
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
-from .simplex import barycentric_to_cartesian, reference_simplex
+
+from .simplex import barycentric_to_cartesian
+
 
 class DataProtocol[TArray: Array](Protocol):
     def v(self, derv: int) -> TArray:
@@ -16,11 +17,12 @@ class DataProtocol[TArray: Array](Protocol):
         ----------
         derv : int
             The drivative order of the basis functions.
-            
+
         Returns
         -------
         TArray
             The basis functions evaluated at x.
+
         """
         ...
 
@@ -37,7 +39,7 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
         ----------
         derv : int
             The drivative order of the basis functions.
-            
+
         Returns
         -------
         TArray
@@ -48,7 +50,7 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
 
 
 class ElementProtocol[TArray: Array, TBC: str](Protocol):
-    def __call__(self, x: TArray, derv: Sequence[tuple[int, int]], /) -> TArray:
+    def __call__(self, x: TArray, derv: int, /) -> TArray:
         """
         Evaluate the element at x with derivatives specified by derv.
 
@@ -59,28 +61,40 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         Parameters
         ----------
         x : TArray
-            The points at which to evaluate the element.
-        derv : Sequence[tuple[int, int]]
-            (i, j) where returns the j-th derivative
-            of the i-th coordinate.
+            The points at which to evaluate the element of shape (..., n).
+        derv : int
+            The drivative order of the basis functions.
 
         Returns
         -------
         TArray
-            The evaluated element at x.
+            The evaluated element at x of shape (..., *derv_shape, n_elements),
+            where derv_shape = (n,) * derv.
 
         """
         ...
-        
-    # def essentical_bc(
-    #     self, bc: Mapping[TBC, TArray], /
-    # ) -> TArray:
-    #     ...
-        
 
-def par
-    
+    def essentical_bc(self, bc: Mapping[TBC, TArray], /) -> TArray: ...
 
+
+class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
+    def __call__(self, x: TArray, derv: int, /) -> TArray:
+        xp = array_namespace(x)
+        if derv == 0:
+            return xp.concat((x, 1 - xp.sum(x, axis=-1)), axis=-1)
+        elif derv == 1:
+            n = x.shape[-1]
+            if n is None:
+                raise ValueError("Unknown dimension of x.")
+            return xp.concat(
+                (
+                    xp.eye(n, dtype=x.dtype, device=x.device),
+                    -xp.ones((1, n + 1), dtype=x.dtype, device=x.device),
+                ),
+                axis=0,
+            )[(None,) * (x.ndim - 1), ...]
+        else:
+            raise ValueError(f"Unsupported derivative order {derv} for P1Element.")
 
 
 @attrs.frozen(kw_only=True)
@@ -92,7 +106,7 @@ class BilinearData[TElement: ElementProtocol, TArray: Array](
     """The vertices of the mesh of shape (n_vertices, d, d + 1)."""
     x_barycentric: TArray
     """The integration points in barycentric coordinates of shape (n_points, d + 1)."""
-    
+
     @property
     def x(self) -> TArray:
         return barycentric_to_cartesian(self.x_barycentric, self.simplex_vertices)
@@ -134,7 +148,7 @@ def fem[TArray: Array, TBC: str](
 
     """
     # (n_simplex, d, d + 1)
-    simplex_vertices = vertices[simplex, :]
+    vertices[simplex, :]
 
 
 # fem()

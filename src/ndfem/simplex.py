@@ -27,7 +27,7 @@ def barycentric_to_cartesian[TArray: Array](
     ----------
     齊藤宣一. (2023年). 偏微分方程式の計算数理 (pp. xii, 544p). 共立出版.
     https://ci.nii.ac.jp/ncid/BD04524053 p.160
-    
+
     """
     return x @ simplex
 

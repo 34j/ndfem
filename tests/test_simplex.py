@@ -1,7 +1,14 @@
-from ndfem.simplex import reference_simplex, barycentric_to_cartesian, cartesian_to_barycentric
 import numpy as np
-from numpy.testing import assert_allclose
 import pytest
+from numpy.testing import assert_allclose
+
+from ndfem.simplex import (
+    barycentric_to_cartesian,
+    cartesian_to_barycentric,
+    reference_simplex,
+)
+
+
 @pytest.mark.parametrize("n", [1, 4])
 def test_reference_simplex(n: int) -> None:
     simplex = reference_simplex(n, ref=np.array(0))
