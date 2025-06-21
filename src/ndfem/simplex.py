@@ -23,6 +23,11 @@ def barycentric_to_cartesian[TArray: Array](
     TArray
         The points transformed to the general simplex.
 
+    References
+    ----------
+    齊藤宣一. (2023年). 偏微分方程式の計算数理 (pp. xii, 544p). 共立出版.
+    https://ci.nii.ac.jp/ncid/BD04524053 p.160
+    
     """
     return x @ simplex
 
@@ -48,6 +53,11 @@ def cartesian_to_barycentric[TArray: Array](
     TArray
         The points transformed to barycentric coordinates of shape (n_points, d + 1).
 
+    References
+    ----------
+    齊藤宣一. (2023年). 偏微分方程式の計算数理 (pp. xii, 544p). 共立出版.
+    https://ci.nii.ac.jp/ncid/BD04524053 p.160
+
     """
     xp = array_namespace(x, simplex)
     simplex = xp.concat((simplex, xp.ones_like(simplex[:, 0, None])), axis=-1)
@@ -72,10 +82,6 @@ def reference_simplex[TArray: Array](n: int, /, ref: TArray) -> TArray:
     TArray
         The points transformed to barycentric coordinates of shape (n_points, d + 1).
 
-    References
-    ----------
-    齊藤宣一. (2023年). 偏微分方程式の計算数理 (pp. xii, 544p). 共立出版.
-    https://ci.nii.ac.jp/ncid/BD04524053 p.160
 
     """
     xp = array_namespace(ref)

@@ -4,7 +4,7 @@ from typing import Callable, Protocol
 import attrs
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
-
+from .simplex import barycentric_to_cartesian
 
 class DataProtocol[TArray: Array](Protocol):
     def v(self, derv: int) -> TArray: ...
@@ -63,14 +63,14 @@ class ElementProtocol[TArray: Array](Protocol):
 class Data[TElement: ElementProtocol, TArray: Array](DataProtocol[TArray]):
     element: TElement
     simplex: TArray
-    x_reference: TArray
+    x_barycentric: TArray
 
+    @property
     def x(self) -> TArray:
-        xp = array_namespace(self.simplex, self.x_reference)
-        return self.simplex @ self.x_reference.astype(xp)
+        return barycentric_to_cartesian(self.x_barycentric, self.simplex)
 
     def v(self, derv: int) -> TArray:
-        return self.element(self.x, [(0, derv)])
+        return self.element(self.x_barycentric, [(0, derv)])
 
 
 @attrs.frozen(kw_only=True)
@@ -78,13 +78,18 @@ class BilinearData[TElement: ElementProtocol, TArray: Array](
     BilinearDataProtocol[TArray]
 ):
     element: TElement
-    x: TArray
+    simplex: TArray
+    x_barycentric: TArray
+    
+    @property
+    def x(self) -> TArray:
+        return barycentric_to_cartesian(self.x_barycentric, self.simplex)
 
     def v(self, derv: int) -> TArray:
-        return self.element(self.x, [(0, derv)])[None, :]
+        return self.element(self.x_barycentric, [(0, derv)])[None, :]
 
     def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
-        return self.element(self.x, derv)[:, None]
+        return self.element(self.x_barycentric, derv)[:, None]
 
 
 # def pk_element[TArray: Array](x: TArray, k: int) -> TArray:
@@ -117,7 +122,7 @@ def fem[TArray: Array, TBC: str](
 
     """
     # (n_simplex, d, d + 1)
-    vertices[simplex, :]
+    simplex_vertices = vertices[simplex, :]
 
 
 # fem()
