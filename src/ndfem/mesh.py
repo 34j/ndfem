@@ -132,7 +132,7 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
     )[0]
     # need to fli nums as meshgrid orders in counter-lexicographic order
     simplexes = xp.reshape(
-        traiangulate_cube(len(lengths), stride=xp.flip(nums))[None, ...] # type: ignore
+        traiangulate_cube(len(lengths), stride=xp.flip(nums))[None, ...]  # type: ignore
         + vertice_indices_start[:, None, None],
         shape=(-1, n + 1),
     )

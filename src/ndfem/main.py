@@ -1,29 +1,53 @@
+from collections.abc import Mapping, Sequence
 from typing import Callable, Protocol
 
 from array_api._2024_12 import Array
 
 
-class Data[TArray: Array](Protocol):
+class DataProtocol[TArray: Array](Protocol):
     def v(self, derv: int) -> TArray: ...
 
     @property
     def x(self) -> TArray: ...
 
 
-class BilinearData[TArray: Array](Data[TArray], Protocol):
-    def u(self, derv: tuple[int, int]) -> TArray:
+class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
+    def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
         """
         Returns the basis functions evaluated at x for a polynomial of degree k.
 
         Parameters
         ----------
-        derv : tuple[int, int]
-            _description_
+        derv : Sequence[tuple[int, int]]
+            (i, j) where returns the j-th derivative
+            of the i-th coordinate.
 
         Returns
         -------
         TArray
-            _description_
+            The basis functions evaluated at x.
+
+        """
+        ...
+
+
+class ElementProtocol[TArray: Array](Protocol):
+    def __call__(self, x: TArray, derv: Sequence[tuple[int, int]], /) -> TArray:
+        """
+        Evaluate the element at x with derivatives specified by derv.
+
+        Parameters
+        ----------
+        x : TArray
+            The points at which to evaluate the element.
+        derv : Sequence[tuple[int, int]]
+            (i, j) where returns the j-th derivative
+            of the i-th coordinate.
+
+        Returns
+        -------
+        TArray
+            The evaluated element at x.
 
         """
         ...
@@ -35,11 +59,13 @@ class BilinearData[TArray: Array](Data[TArray], Protocol):
 #     n = x.shape[-1]
 
 
-def fem[TArray: Array](
+def fem[TArray: Array, TBC: str](
     vertices: TArray,
     simplex: TArray,
-    bilinear_form: Callable[[BilinearData[TArray]], TArray],
-    linear_form: Callable[[Data[TArray]], TArray],
+    bilinear_form: Callable[[BilinearDataProtocol[TArray]], TArray],
+    linear_form: Callable[[DataProtocol[TArray]], TArray],
+    element: ElementProtocol[TArray] | None = None,
+    essential_bc: Mapping[TBC, TArray] | None = None,
 ) -> TArray:
     """
     Finite element method for a triangle mesh.
@@ -47,16 +73,16 @@ def fem[TArray: Array](
     Parameters
     ----------
     vertices : TArray
-        The vertices of the mesh of shape (n, d).
+        The vertices of the mesh of shape (n_vertices, d).
     simplex : TArray
-        The indices of the vertices that form simplex of shape (m, d).
+        The indices of the vertices that form simplex of shape (n_simpex, d + 1).
     bilinear_form : Callable[[BilinearData[TArray]], TArray]
         The bilinear form to be integrated over simplex.
     linear_form : Callable[[Data[TArray]], TArray]
         The linear form to be integrated over simplex.
 
     """
-    # (n, d, d)
+    # (n_simplex, d, d + 1)
     simplex_vertices = vertices[simplex, :]
 
 
