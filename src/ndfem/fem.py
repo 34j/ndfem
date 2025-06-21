@@ -74,12 +74,36 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         """
         ...
 
-    def essentical_bc(self, bc: Mapping[TBC, TArray], /) -> TArray: ...
+    def essentical_bc(self, bc: Mapping[TBC, TArray], /) -> TArray:
+        """The essential boundary conditions for the element.
+        
+        Parameters
+        ----------
+        bc : Mapping[TBC, TArray]
+            The essential boundary conditions to apply to the element.
+            The keys are the boundary condition types, e.g. 'dirichelet',
+            and the values are array of shape (n_surfaces)
+            which specify the surface number (the vertice number
+            which is not on the surface).
+
+        Returns
+        -------
+        TArray
+            The basis functions which should be omitted of shape (n_basis_to_omit,).
+        """
+        ...
 
 
+@attrs.frozen(kw_only=True)
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
+    n: int
+    
     def __call__(self, x: TArray, derv: int, /) -> TArray:
         xp = array_namespace(x)
+        if xp.shape[-1] != self.n + 1:
+            raise ValueError(
+                f"Expected last dimension of x to be {self.n + 1}, got {xp.shape[-1]}."
+            )
         if derv == 0:
             return xp.concat((x, 1 - xp.sum(x, axis=-1)), axis=-1)
         elif derv == 1:
@@ -96,9 +120,27 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         else:
             raise ValueError(f"Unsupported derivative order {derv} for P1Element.")
 
+    def essentical_bc(self, bc: Mapping[Literal['dirichelet'], TArray]) -> TArray | None:
+        if bc.keys() != {"dirichelet"}:
+            raise ValueError("Only 'dirichelet' boundary condition is supported.")
+        dv = bc.get("dirichelet", None)
+        if dv is None:
+            return None
+        xp = array_namespace(dv)
+        if dv.size is None or dv.size > 1:
+            return xp.arange(self.n + 1)
+        elif dv.size == 0:
+            return xp.empty((0,), dtype=xp.int64, device=dv.device)
+        else:
+            res = xp.arange(self.n + 1)
+            res = res[res != dv[0]]
+            return res.astype(xp.int64, device=dv.device)
+        
+        
+        
 
 @attrs.frozen(kw_only=True)
-class BilinearData[TElement: ElementProtocol, TArray: Array](
+class BilinearData[TArray: Array, TElement: ElementProtocol](
     BilinearDataProtocol[TArray]
 ):
     element: TElement
