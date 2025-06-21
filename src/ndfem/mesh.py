@@ -3,6 +3,39 @@ from typing import Callable, Protocol
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
 import numpy as np
+import attrs
+
+class MeshProtocol[TArray: Array](Protocol):
+    """
+    A mesh for finite element methods.
+
+    Parameters
+    ----------
+    vertices : TArray
+        The vertices of the mesh of shape (n_vertices, d).
+    simplex : TArray
+        The indices of the vertices that form simplex of shape (n_simpex, d).
+    """
+    @property
+    def vertices(self) -> TArray: ...
+        """The vertices of the mesh of shape (n_vertices, d)."""
+    
+    @property
+    def simplex(self) -> TArray: ...
+        """The indices of the vertices that form simplex of shape (n_simpex, d)."""
+    
+@attrs.frozen(kw_only=True)
+class Mesh(MeshProtocol[TArray]):
+    vertices: TArray
+    simplex: TArray
+
+    def __attrs_post_init__(self):
+        if self.vertices.ndim != 2:
+            raise ValueError("Vertices must be a 2D array.")
+        if self.simplex.ndim != 2:
+            raise ValueError("Simplex must be a 2D array.")
+        if self.simplex.shape[1] != self.vertices.shape[1]:
+            raise ValueError("Simplex must have the same number of dimensions as vertices.")
 
 def traiangulate_cube[TArray: Array](n: int, stride: TArray | None = None) -> TArray:
     """
@@ -40,14 +73,12 @@ def traiangulate_cube[TArray: Array](n: int, stride: TArray | None = None) -> TA
         stride = np.ones(n, dtype=int)
     xp = array_namespace(n, stride)
     diff = xp.cumulative_sum(stride)
-    print(diff)
     # (n!, n)
     diff_perm = xp.asarray(list(permutations(diff)))
-    print(diff_perm)
     return xp.cumulative_sum(diff_perm, axis=1, include_initial=True)
 
 
-def cuboid[TArray: Array](lengths: TArray, units: TArray) -> TArray:
+def cuboid[TArray: Array](lengths: TArray, units: TArray) -> MeshProtocol[TArray]:
     xp = array_namespace(lengths, units)
     lengths, units = xp.broadcast_arrays(lengths, units)
     if lengths.ndim != 1:
