@@ -33,7 +33,7 @@ class Mesh[TArray: Array](MeshProtocol[TArray]):
     vertices: TArray
     simplex: TArray
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         if self.vertices.ndim != 2:
             raise ValueError("Vertices must be a 2D array.")
         if self.simplex.ndim != 2:
@@ -82,7 +82,7 @@ def traiangulate_cube[TArray: Array](
     if stride is None:
         stride = np.ones(n, dtype=int)
     xp = array_namespace(n, stride)
-    diff = xp.concat((xp.ones((1,), dtype=int),xp.cumulative_prod(stride[:-1] + 1)))
+    diff = xp.concat((xp.ones((1,), dtype=int), xp.cumulative_prod(stride[:-1] + 1)))
     # (n!, n)
     diff_perm = xp.asarray(list(permutations(diff)))
     return xp.cumulative_sum(diff_perm, axis=1, include_initial=True)
@@ -108,30 +108,31 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
         (n, -1),
     ).T
     vertice_indices_touching_right_edge = xp.reshape(
-                xp.stack(
-                    xp.meshgrid(
-                        *[
-                            xp.concat(
-                                (
-                                    xp.zeros((num,), dtype=xp.bool),
-                                    xp.ones((1,), dtype=xp.bool),
-                                )
-                            )
-                            for num in nums
-                        ],
-                        indexing="ij",
+        xp.stack(
+            xp.meshgrid(
+                *[
+                    xp.concat(
+                        (
+                            xp.zeros((num,), dtype=xp.bool),
+                            xp.ones((1,), dtype=xp.bool),
+                        )
                     )
-                ),
-                (n, -1),
+                    for num in nums
+                ],
+                indexing="ij",
             )
+        ),
+        (n, -1),
+    )
     vertice_indices_start = xp.nonzero(
         xp.all(
             ~vertice_indices_touching_right_edge,
             axis=0,
         )
     )[0]
+    # need to fli nums as meshgrid orders in counter-lexicographic order
     simplexes = xp.reshape(
-        traiangulate_cube(len(lengths), stride=xp.flip(nums))[None, ...]
+        traiangulate_cube(len(lengths), stride=xp.flip(nums))[None, ...] # type: ignore
         + vertice_indices_start[:, None, None],
         shape=(-1, n + 1),
     )
