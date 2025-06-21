@@ -36,54 +36,6 @@ class BilinearData[TArray: Array](Data[TArray], Protocol):
 #     n = x.shape[-1]
 
 
-def traiangulate_cube(n: int) -> Array:
-    """
-    Triangulate hypercube [0, 1]^n into n! simplexes.
-
-    Simplexes are {{x | 0 <= x_sigma(1) <= ... <= x_sigma(n) <= 1} | sigma in S_n}.
-
-    Note that this is not a minimal traiangulation.
-
-    Parameters
-    ----------
-    n : int
-        The dimension of the hypercube.
-
-    Returns
-    -------
-    Array
-        The vertice numbers of the simplexes in the triangulation of shape (n!, n).
-
-        The first axis corresponds to the simplex number, the second axis corresponds to the vertex number.
-
-        The vertice numbers are ordered lexicographically,
-        e.g. 0 -> (0, ..., 0), 1 -> (0, ..., 1), 2 -> (0, ..., 1, 0), 3 -> (0, ..., 1, 1), ...
-        2^n - 1 -> (1, ..., 1).
-
-        Since the simplexes are surrounded by n + 1 planes, which are
-        0 = x_sigma(1), x_sigma(i) = x_sigma(i + 1) for i = 1, ..., n - 1, x_sigma(n) = 1,
-        the vertices are the points where n of these planes intersect.
-
-    """
-    from itertools import permutations
-
-    xp = array_namespace(n)
-    diff = 2 ** xp.arange(n)
-    # (n!, n)
-    diff_perm = xp.asarray(permutations(diff))
-    return xp.cumulative_sum(diff_perm, axis=1)
-
-
-def cuboid[TArray: Array](lengths: TArray, units: TArray) -> TArray:
-    xp = array_namespace(lengths, units)
-    lengths, units = xp.broadcast_arrays(lengths, units)
-    if lengths.ndim != 1:
-        raise ValueError()
-    nums = -lengths // -units
-    vertices = xp.meshgrid(
-        *[xp.linspace(0, length, num=scale) for length, scale in zip(lengths, nums)],
-        indexing="ij",
-    )
 
 
 def fem[TArray: Array](
@@ -111,24 +63,24 @@ def fem[TArray: Array](
     simplex_vertices = vertices[simplex, :]
 
 
-fem()
+# fem()
 
 
-import numpy as np
-import quadpy
+# import numpy as np
+# import quadpy
 
-dim = 4
-scheme = quadpy.tn.grundmann_moeller(dim, 3)
-val = scheme.integrate(
-    lambda x: np.exp(x[0]),
-    np.array(
-        [
-            [0.0, 0.0, 0.0, 0.0],
-            [1.0, 2.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 3.0, 1.0, 0.0],
-            [0.0, 0.0, 4.0, 1.0],
-        ]
-    ),
-)
-print(val)
+# dim = 4
+# scheme = quadpy.tn.grundmann_moeller(dim, 3)
+# val = scheme.integrate(
+#     lambda x: np.exp(x[0]),
+#     np.array(
+#         [
+#             [0.0, 0.0, 0.0, 0.0],
+#             [1.0, 2.0, 0.0, 0.0],
+#             [0.0, 1.0, 0.0, 0.0],
+#             [0.0, 3.0, 1.0, 0.0],
+#             [0.0, 0.0, 4.0, 1.0],
+#         ]
+#     ),
+# )
+# print(val)
