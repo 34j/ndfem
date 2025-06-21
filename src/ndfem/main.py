@@ -1,8 +1,9 @@
 from collections.abc import Mapping, Sequence
 from typing import Callable, Protocol
 
-from array_api._2024_12 import Array
 import attrs
+from array_api._2024_12 import Array
+from array_api_compat import array_namespace
 
 
 class DataProtocol[TArray: Array](Protocol):
@@ -37,6 +38,10 @@ class ElementProtocol[TArray: Array](Protocol):
         """
         Evaluate the element at x with derivatives specified by derv.
 
+        The element must be a reference simplex,
+        i.e. the vertices are
+        (0, 0, ..., 0), (1, 0, ..., 0), ..., (0, 0, ..., 1).
+
         Parameters
         ----------
         x : TArray
@@ -52,27 +57,35 @@ class ElementProtocol[TArray: Array](Protocol):
 
         """
         ...
-        
+
+
 @attrs.frozen(kw_only=True)
 class Data[TElement: ElementProtocol, TArray: Array](DataProtocol[TArray]):
     element: TElement
-    x: TArray
-    
+    simplex: TArray
+    x_reference: TArray
+
+    def x(self) -> TArray:
+        xp = array_namespace(self.simplex, self.x_reference)
+        return self.simplex @ self.x_reference.astype(xp)
+
     def v(self, derv: int) -> TArray:
         return self.element(self.x, [(0, derv)])
 
+
 @attrs.frozen(kw_only=True)
-class BilinearData[TElement: ElementProtocol, TArray: Array](BilinearDataProtocol[TArray]):
+class BilinearData[TElement: ElementProtocol, TArray: Array](
+    BilinearDataProtocol[TArray]
+):
     element: TElement
     x: TArray
-    
+
     def v(self, derv: int) -> TArray:
         return self.element(self.x, [(0, derv)])[None, :]
-    
+
     def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
         return self.element(self.x, derv)[:, None]
-    
-    
+
 
 # def pk_element[TArray: Array](x: TArray, k: int) -> TArray:
 #     """Returns the basis functions evaluated at x for a polynomial of degree k.
@@ -110,21 +123,8 @@ def fem[TArray: Array, TBC: str](
 # fem()
 
 
-# import numpy as np
-# import quadpy
+import quadpy
 
-# dim = 4
-# scheme = quadpy.tn.grundmann_moeller(dim, 3)
-# val = scheme.integrate(
-#     lambda x: np.exp(x[0]),
-#     np.array(
-#         [
-#             [0.0, 0.0, 0.0, 0.0],
-#             [1.0, 2.0, 0.0, 0.0],
-#             [0.0, 1.0, 0.0, 0.0],
-#             [0.0, 3.0, 1.0, 0.0],
-#             [0.0, 0.0, 4.0, 1.0],
-#         ]
-#     ),
-# )
-# print(val)
+scheme = quadpy.tn.grundmann_moeller(3, 2)
+# scheme = quadpy.tn.stroud_1969(3)
+print(scheme.weights.shape, scheme.points.shape)
