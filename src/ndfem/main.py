@@ -117,7 +117,7 @@ def fem[TArray: Array, TBC: str](
 
     """
     # (n_simplex, d, d + 1)
-    simplex_vertices = vertices[simplex, :]
+    vertices[simplex, :]
 
 
 # fem()
