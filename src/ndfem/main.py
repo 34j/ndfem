@@ -2,6 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import Callable, Protocol
 
 from array_api._2024_12 import Array
+import attrs
 
 
 class DataProtocol[TArray: Array](Protocol):
@@ -51,7 +52,27 @@ class ElementProtocol[TArray: Array](Protocol):
 
         """
         ...
+        
+@attrs.frozen(kw_only=True)
+class Data[TElement: ElementProtocol, TArray: Array](DataProtocol[TArray]):
+    element: TElement
+    x: TArray
+    
+    def v(self, derv: int) -> TArray:
+        return self.element(self.x, [(0, derv)])
 
+@attrs.frozen(kw_only=True)
+class BilinearData[TElement: ElementProtocol, TArray: Array](BilinearDataProtocol[TArray]):
+    element: TElement
+    x: TArray
+    
+    def v(self, derv: int) -> TArray:
+        return self.element(self.x, [(0, derv)])[None, :]
+    
+    def u(self, derv: Sequence[tuple[int, int]]) -> TArray:
+        return self.element(self.x, derv)[:, None]
+    
+    
 
 # def pk_element[TArray: Array](x: TArray, k: int) -> TArray:
 #     """Returns the basis functions evaluated at x for a polynomial of degree k.
