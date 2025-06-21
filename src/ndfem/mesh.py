@@ -82,7 +82,7 @@ def traiangulate_cube[TArray: Array](
     if stride is None:
         stride = np.ones(n, dtype=int)
     xp = array_namespace(n, stride)
-    diff = xp.cumulative_sum(stride)
+    diff = xp.concat((xp.ones((1,), dtype=int),xp.cumulative_prod(stride[:-1] + 1)))
     # (n!, n)
     diff_perm = xp.asarray(list(permutations(diff)))
     return xp.cumulative_sum(diff_perm, axis=1, include_initial=True)
@@ -107,9 +107,7 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
         ),
         (n, -1),
     ).T
-    vertice_indices_start = xp.nonzero(
-        xp.all(
-            xp.reshape(
+    vertice_indices_touching_right_edge = xp.reshape(
                 xp.stack(
                     xp.meshgrid(
                         *[
@@ -126,13 +124,14 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
                 ),
                 (n, -1),
             )
-            == 0,
+    vertice_indices_start = xp.nonzero(
+        xp.all(
+            ~vertice_indices_touching_right_edge,
             axis=0,
         )
     )[0]
-    print(vertice_indices_start)
     simplexes = xp.reshape(
-        traiangulate_cube(len(lengths), stride=nums)[None, ...]
+        traiangulate_cube(len(lengths), stride=xp.flip(nums))[None, ...]
         + vertice_indices_start[:, None, None],
         shape=(-1, n + 1),
     )

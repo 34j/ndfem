@@ -19,7 +19,7 @@ def test_traiangulate():
 
 
 def test_cuboid():
-    actual = cuboid(np.asarray([1, 1, 1]), 1)
+    actual = cuboid(np.asarray([2, 2, 1]), 1)
     meshio.Mesh(actual.vertices, {"triangle": simplex_planes(actual.simplex)}).write(
         "tests/.cache/cuboid.obj"
     )
