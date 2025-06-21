@@ -75,8 +75,9 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         ...
 
     def essentical_bc(self, bc: Mapping[TBC, TArray], /) -> TArray:
-        """The essential boundary conditions for the element.
-        
+        """
+        The essential boundary conditions for the element.
+
         Parameters
         ----------
         bc : Mapping[TBC, TArray]
@@ -90,6 +91,7 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         -------
         TArray
             The basis functions which should be omitted of shape (n_basis_to_omit,).
+
         """
         ...
 
@@ -97,15 +99,15 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
 @attrs.frozen(kw_only=True)
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
     n: int
-    
+
     def __call__(self, x: TArray, derv: int, /) -> TArray:
         xp = array_namespace(x)
-        if xp.shape[-1] != self.n + 1:
+        if x.shape[-1] != self.n:
             raise ValueError(
-                f"Expected last dimension of x to be {self.n + 1}, got {xp.shape[-1]}."
+                f"Expected last dimension of x to be {self.n=}, got {x.shape[-1]=}."
             )
         if derv == 0:
-            return xp.concat((x, 1 - xp.sum(x, axis=-1)), axis=-1)
+            return xp.concat((x, (1 - xp.sum(x, axis=-1))[None]), axis=-1)
         elif derv == 1:
             n = x.shape[-1]
             if n is None:
@@ -120,7 +122,9 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         else:
             raise ValueError(f"Unsupported derivative order {derv} for P1Element.")
 
-    def essentical_bc(self, bc: Mapping[Literal['dirichelet'], TArray]) -> TArray | None:
+    def essentical_bc(
+        self, bc: Mapping[Literal["dirichelet"], TArray]
+    ) -> TArray | None:
         if bc.keys() != {"dirichelet"}:
             raise ValueError("Only 'dirichelet' boundary condition is supported.")
         dv = bc.get("dirichelet", None)
@@ -135,9 +139,7 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
             res = xp.arange(self.n + 1)
             res = res[res != dv[0]]
             return res.astype(xp.int64, device=dv.device)
-        
-        
-        
+
 
 @attrs.frozen(kw_only=True)
 class BilinearData[TArray: Array, TElement: ElementProtocol](
@@ -171,7 +173,7 @@ def fem[TArray: Array, TBC: str](
     simplex: TArray,
     bilinear_form: Callable[[BilinearDataProtocol[TArray]], TArray],
     linear_form: Callable[[DataProtocol[TArray]], TArray],
-    element: ElementProtocol[TArray] | None = None,
+    element: ElementProtocol[TArray, TBC] | None = None,
     # essential_bc: Mapping[TBC, TArray] | None = None,
 ) -> TArray:
     """
