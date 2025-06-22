@@ -54,7 +54,7 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
 
 
 class ElementProtocol[TArray: Array, TBC: str](Protocol):
-    def __call__(self, x: TArray, d_subentity: int, derv: int, /) -> TArray | None:
+    def __call__(self, x: TArray, d1_subentity: int, derv: int, /) -> TArray | None:
         """
         Evaluate the element at x with derivatives specified by derv.
 
@@ -68,7 +68,7 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
             The points at which to evaluate the element of shape (..., n).
         subentity : int
             The subentity number.
-            The basis functions belong to the n-subentity of the simplex.
+            The basis functions belong to the d1-subentity of the simplex.
             The basis functions are shared among other simplexes which
             share the one of the n-subentities in the simplex.
         derv : int
@@ -82,11 +82,11 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
             where derv_shape = (n,) * derv.
 
             The basis functions must not be repeated
-            for each n-subentity but must be for
-            the first n-subentity in terms of lexicographic order.
+            for each d1-subentity but must be for
+            the first d1-subentity in terms of lexicographic order.
 
             The basis functions must be symmetric under
-            permutation of the vertices of the n-subentity.
+            permutation of the vertices of the d1-subentity.
 
         """
         ...
@@ -115,25 +115,25 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
 
 @attrs.frozen(kw_only=True)
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
-    n: int
+    d: int
     bubble: bool = False
 
-    def __call__(self, x: TArray, d_subentity: int, derv: int, /) -> TArray | None:
+    def __call__(self, x: TArray, d1_subentity: int, derv: int, /) -> TArray | None:
         xp = array_namespace(x)
-        if x.shape[-1] != self.n:
+        if x.shape[-1] != self.d:
             raise ValueError(
-                f"Expected last dimension of x to be {self.n=}, got {x.shape[-1]=}."
+                f"Expected last dimension of x to be {self.d=}, got {x.shape[-1]=}."
             )
         if derv == 0:
-            if d_subentity == 0:
+            if d1_subentity == 0:
                 return (1 - xp.sum(x, axis=-1))[..., None]
-            if d_subentity == self.n and self.bubble:
-                return ((self.n ** self.n) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[..., None]
+            if d1_subentity == self.d and self.bubble:
+                return ((self.d ** self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[..., None]
             else:
                 return None
         elif derv == 1:
-            if d_subentity == 0:
-                return -xp.ones((self.n + 1, 1), dtype=x.dtype, device=x.device)[
+            if d1_subentity == 0:
+                return -xp.ones((self.d + 1, 1), dtype=x.dtype, device=x.device)[
                     (None,) * (x.ndim - 1), ...
                 ]
             else:
@@ -151,11 +151,11 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         dv = bc["dirichelet"]
         xp = array_namespace(dv)
         if dv.size is None or dv.size > 1:
-            return xp.arange(self.n + 1)
+            return xp.arange(self.d + 1)
         elif dv.size == 0:
             return xp.empty((0,), dtype=xp.int64, device=dv.device)
         else:
-            res = xp.arange(self.n + 1)
+            res = xp.arange(self.d + 1)
             res = res[res != dv[0]]
             return res.astype(xp.int64, device=dv.device)
 
@@ -209,7 +209,7 @@ def evaluate_basis[TArray: Array](
     -------
     TArray
         The basis functions evaluated at the barycentric coordinates,
-        of shape (..., *derv_shape, n_basis_n),
+        of shape (..., *derv_shape, sum_n_basis_n),
 
     """
     xp = array_namespace(x_barycentric)
