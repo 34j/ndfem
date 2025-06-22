@@ -158,10 +158,9 @@ def mesh_subentities[TArray: Array](simplex: TArray, d1_subentities: int, /) -> 
 
     """
     xp = array_namespace(simplex)
-    n = simplex.shape[1] - 1
     # (n_comb, d1_subentities + 1)
     comb = xp.asarray(
-        list(combinations(xp.arange(n, dtype=xp.int16), d1_subentities + 1)),
+        list(combinations(range(simplex.shape[1]), d1_subentities + 1)),
         dtype=xp.int16,
     )
     # (n_simplex, n_comb, d1_subentities + 1)
