@@ -5,7 +5,7 @@ import attrs
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
 
-from .simplex import barycentric_to_cartesian
+from .simplex import barycentric_to_cartesian, reference_simplex
 
 
 class DataProtocol[TArray: Array](Protocol):
@@ -50,7 +50,7 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
 
 
 class ElementProtocol[TArray: Array, TBC: str](Protocol):
-    def __call__(self, x: TArray, derv: int, /) -> TArray:
+    def __call__(self, x: TArray, d_subentity: int, derv: int, /) -> TArray | None:
         """
         Evaluate the element at x with derivatives specified by derv.
 
@@ -62,14 +62,27 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         ----------
         x : TArray
             The points at which to evaluate the element of shape (..., n).
+        subentity : int
+            The subentity number.
+            The basis functions belong to the n-subentity of the simplex.
+            The basis functions are shared among other simplexes which
+            share the one of the n-subentities in the simplex.
         derv : int
-            The drivative order of the basis functions.
+            The derivative order of the basis functions.
 
         Returns
         -------
         TArray
-            The evaluated element at x of shape (..., *derv_shape, n_elements),
+            The basis functions evaluated at x 
+            of shape (..., *derv_shape, n_basis_n),
             where derv_shape = (n,) * derv.
+            
+            The basis functions must not be repeated
+            for each n-subentity but must be for 
+            the first n-subentity in terms of lexicographic order.
+            
+            The basis functions must be symmetric under
+            permutation of the vertices of the n-subentity.
 
         """
         ...
@@ -100,25 +113,22 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
     n: int
 
-    def __call__(self, x: TArray, derv: int, /) -> TArray:
+    def __call__(self, x: TArray, d_subentity: int, derv: int, /) -> TArray | None:
         xp = array_namespace(x)
         if x.shape[-1] != self.n:
             raise ValueError(
                 f"Expected last dimension of x to be {self.n=}, got {x.shape[-1]=}."
             )
         if derv == 0:
-            return xp.concat((x, (1 - xp.sum(x, axis=-1))[None]), axis=-1)
+            if d_subentity == 0:
+                return (1 - xp.sum(x, axis=-1))[..., None]
+            else:
+                return None
         elif derv == 1:
-            n = x.shape[-1]
-            if n is None:
-                raise ValueError("Unknown dimension of x.")
-            return xp.concat(
-                (
-                    xp.eye(n, dtype=x.dtype, device=x.device),
-                    -xp.ones((1, n + 1), dtype=x.dtype, device=x.device),
-                ),
-                axis=0,
-            )[(None,) * (x.ndim - 1), ...]
+            if d_subentity == 0:
+                return -xp.ones((self.n + 1, 1), dtype=x.dtype, device=x.device)[(None,) * (x.ndim - 1), ...]
+            else:
+                return None
         else:
             raise ValueError(f"Unsupported derivative order {derv} for P1Element.")
 
@@ -127,9 +137,9 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
     ) -> TArray | None:
         if bc.keys() != {"dirichelet"}:
             raise ValueError("Only 'dirichelet' boundary condition is supported.")
-        dv = bc.get("dirichelet", None)
-        if dv is None:
+        if "dirichelet" not in bc:
             return None
+        dv = bc["dirichelet"]
         xp = array_namespace(dv)
         if dv.size is None or dv.size > 1:
             return xp.arange(self.n + 1)
@@ -140,6 +150,32 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
             res = res[res != dv[0]]
             return res.astype(xp.int64, device=dv.device)
 
+def funcs_to_general[TArray: Array](
+    funcs: TArray,
+    simplex_vertices: TArray,
+    derv: int
+) -> TArray:
+    """Convert the (derivatives of) basis functions to a general simplex.
+
+    Parameters
+    ----------
+    funcs : TArray
+        The basis functions evaluated of shape (..., *derv_shape, n_basis_n).
+    """
+    xp = array_namespace(simplex_vertices)
+    jaccobian = simplex_vertices[:, :, 1:] - simplex_vertices[:, :, 0:1]
+    return funcs @ xp.linalg.matrix_power(jaccobian, derv)
+
+
+def evaluate_basis[TArray: Array](
+    element: ElementProtocol[TArray, str],
+    x_barycentric: TArray,
+    derv: int,
+) -> TArray:
+    n = x_barycentric.shape[-1] - 1
+    simplex = reference_simplex(n)
+    x_reference = barycentric_to_cartesian(x_barycentric)
+    
 
 @attrs.frozen(kw_only=True)
 class BilinearData[TArray: Array, TElement: ElementProtocol](
@@ -158,8 +194,7 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](
     def _funcs(self, derv: int) -> TArray:
         xp = array_namespace(self.x_barycentric, self.simplex_vertices)
         funcs = self.element(self.x_barycentric, derv)[None, :]
-        mat = self.simplex_vertices[:, :, 1:] - self.simplex_vertices[:, :, 0:1]
-        return funcs @ xp.linalg.matrix_power(mat, derv)
+
 
     def v(self, derv: int) -> TArray:
         return self._funcs(derv)[None, :]

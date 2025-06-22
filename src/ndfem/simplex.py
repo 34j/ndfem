@@ -1,5 +1,8 @@
-from array_api._2024_12 import Array
+from typing import Any
+from array_api._2024_12 import Array, ArrayNamespace
 from array_api_compat import array_namespace
+import numpy as np
+from itertools import combinations
 
 
 def barycentric_to_cartesian[TArray: Array](
@@ -14,14 +17,15 @@ def barycentric_to_cartesian[TArray: Array](
     Parameters
     ----------
     x : TArray
-        The points in barycentric coordinates of shape (n_points, d + 1).
+        The points in barycentric coordinates of shape (..., n_points, d + 1).
     simplex : TArray
-        The vertices of the simplex of shape (d + 1, d).
+        The vertices of the simplex of shape (..., d + 1, d).
 
     Returns
     -------
     TArray
-        The points transformed to the general simplex.
+        The points transformed to the general simplex
+        of shape (..., n_points, d)
 
     References
     ----------
@@ -65,7 +69,7 @@ def cartesian_to_barycentric[TArray: Array](
     return xp.linalg.solve(simplex.T, x.T).T
 
 
-def reference_simplex[TArray: Array](n: int, /, ref: TArray) -> TArray:
+def reference_simplex[TArray: Array](n: int, /, xp: ArrayNamespace[TArray, Any, Any] = np, dtype: Any = None, device: Any = None) -> TArray:
     """
     Transform the points `x` from the general simplex to the barycentric coordinates
     of the reference simplex.
@@ -84,12 +88,20 @@ def reference_simplex[TArray: Array](n: int, /, ref: TArray) -> TArray:
 
 
     """
-    xp = array_namespace(ref)
     simplex = xp.concat(
         (
-            xp.zeros((1, n), dtype=ref.dtype, device=ref.device),
-            xp.eye(n, dtype=ref.dtype, device=ref.device),
+            xp.zeros((1, n), dtype=dtype, device=device),
+            xp.eye(n, dtype=dtype, device=device),
         ),
         axis=0,
     )
     return simplex
+
+
+def all_rotated_simplex[TArray: Array](n: int, subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> TArray:
+    result = []
+    vertices = np.arange(n)
+    for comb in combinations(vertices, subentities):
+        line = list(comb) + list(set(vertices) - set(comb))
+        result.append(line)
+    return np.asarray(result)
