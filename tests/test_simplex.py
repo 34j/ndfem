@@ -26,6 +26,6 @@ def test_simplex(n: int) -> None:
     assert_allclose(cartesian, cartesian2)
 
 
-@pytest.mark.parametrize("n", [1, 4])
+@pytest.mark.parametrize("n", [1, 3])
 def test_rotated_simplex(n: int) -> None:
     print(all_rotated_simplex(n, max(1, n-1)))

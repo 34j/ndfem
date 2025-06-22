@@ -98,10 +98,24 @@ def reference_simplex[TArray: Array](n: int, /, xp: ArrayNamespace[TArray, Any, 
     return simplex
 
 
-def all_rotated_simplex[TArray: Array](n: int, subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> TArray:
+def all_rotated_simplex[TArray: Array](n: int, n_subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> TArray:
+    """All permutations for subentities.
+
+    Returns
+    -------
+    TArray
+        All combinations of subentities in the simplex of shape (nCn_subentities, n).
+        
+    Examples
+    --------
+    >>> from ndfem.simplex import all_rotated_simplex
+    >>> all_rotated_simplex(3, 2)
+    array([[0, 1, 2], [0, 2, 1], [1, 2, 0]])
+            ----       ----       ----
+    """
     result = []
     vertices = np.arange(n)
-    for comb in combinations(vertices, subentities):
+    for comb in combinations(vertices, n_subentities):
         line = list(comb) + list(set(vertices) - set(comb))
         result.append(line)
     return np.asarray(result)
