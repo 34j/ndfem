@@ -11,7 +11,7 @@ license = { text = "MIT" }
 authors = [
   { name = "34j", email = "34j.95a2p@simplelogin.com" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Developers",
@@ -26,8 +26,13 @@ classifiers = [
 ]
 
 dependencies = [
+  "array-api-compat>=1.11.2",
+  "attrs>=25.3.0",
+  "legacy-quadpy>=0.16.10",
   "rich>=10",
+  "symfem>=2025.6.0",
   "typer>=0.15,<1",
+  "types-array-api>=1.1.2",
 ]
 urls."Bug Tracker" = "https://github.com/34j/ndfem/issues"
 urls.Changelog = "https://github.com/34j/ndfem/blob/main/CHANGELOG.md"
@@ -37,6 +42,7 @@ scripts.ndfem = "ndfem.cli:app"
 
 [dependency-groups]
 dev = [
+  "meshio>=5.3.5",
   "pytest>=8,<9",
   "pytest-cov>=6,<7",
 ]
@@ -48,7 +54,7 @@ docs = [
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 lint.select = [
   "B",   # flake8-bugbear
   "D",   # flake8-docstrings
@@ -63,6 +69,8 @@ lint.select = [
 ]
 lint.ignore = [
   "D203", # 1 blank line required before class docstring
+  "D205",
+  "D105",
   "D212", # Multi-line docstring summary should start at the first line
   "D100", # Missing docstring in public module
   "D104", # Missing docstring in public package
