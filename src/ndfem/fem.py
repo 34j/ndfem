@@ -208,7 +208,7 @@ def transform_derivatives[TArray: Array](
     # (..., n_simplex, *derv_shape, d)
     jaccobian = jaccobian[(None,) * x_extra_ndim + (slice(None),) + (None,) * (derv - 1) + (slice(None), slice(None))]
     # (..., n_simplex, *derv_shape, n_basis)
-    funcs = funcs[..., None, (slice(None),) * (derv + 1)]
+    funcs = funcs[(..., None) + (slice(None),) * (derv + 1)]
     for _ in range(derv):
         funcs = jaccobian @ funcs
         funcs = xp.moveaxis(funcs, -2, -derv - 1)
