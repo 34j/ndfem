@@ -160,7 +160,7 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
             return res.astype(xp.int64, device=dv.device)
 
 
-def funcs_to_general[TArray: Array](
+def transform_derivatives[TArray: Array](
     funcs: TArray, simplex_vertices: TArray, derv: int
 ) -> TArray:
     """
@@ -170,6 +170,16 @@ def funcs_to_general[TArray: Array](
     ----------
     funcs : TArray
         The basis functions evaluated of shape (..., *derv_shape, n_basis_n).
+    simplex_vertices : TArray
+        The vertices of the simplex of shape (n_simplex, d, d + 1).
+    derv : int
+        The derivative order of the basis functions to evaluate.
+        
+    Returns
+    -------
+    TArray
+        The basis functions transformed to the general simplex,
+        of shape (..., *derv_shape, n_basis_n).
 
     """
     xp = array_namespace(simplex_vertices)
@@ -220,6 +230,37 @@ def evaluate_basis[TArray: Array](
         results.append(value)
     return xp.concat(results, axis=-1)
 
+def evaluate_basis_and_transform_derivatives[TArray: Array](
+    element: ElementProtocol[TArray, Any],
+    x_barycentric: TArray,
+    simplex_vertices: TArray,
+    derv: int,
+) -> TArray:
+    """
+    Evaluate the basis functions at the given barycentric coordinates
+    and transform them to the general simplex.
+
+    Parameters
+    ----------
+    element : ElementProtocol[TArray, Any]
+        The element to evaluate the basis functions for.
+    x_barycentric : TArray
+        The barycentric coordinates of the points to evaluate the basis functions at,
+        of shape (..., n_points, d + 1).
+    simplex_vertices : TArray
+        The vertices of the simplex of shape (n_simplex, d, d + 1).
+    derv : int
+        The derivative order of the basis functions to evaluate.
+
+    Returns
+    -------
+    TArray
+        The basis functions evaluated at the barycentric coordinates,
+        transformed to the general simplex, of shape (..., *derv_shape, n_basis_n).
+
+    """
+    funcs = evaluate_basis(element, x_barycentric, derv)
+    return transform_derivatives(funcs, simplex_vertices, derv)
 
 @attrs.frozen(kw_only=True)
 class BilinearData[TArray: Array, TElement: ElementProtocol](
@@ -236,8 +277,9 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](
         return barycentric_to_cartesian(self.x_barycentric, self.simplex_vertices)
 
     def _funcs(self, derv: int) -> TArray:
-        array_namespace(self.x_barycentric, self.simplex_vertices)
-        self.element(self.x_barycentric, derv)[None, :]
+        return evaluate_basis_and_transform_derivatives(
+            self.element, self.x_barycentric, self.simplex_vertices, derv
+        )
 
     def v(self, derv: int) -> TArray:
         return self._funcs(derv)[None, :]
@@ -270,7 +312,7 @@ def fem[TArray: Array, TBC: str](
 
     """
     # (n_simplex, d, d + 1)
-    vertices[simplex, :]
+    simplex_vertices = vertices[simplex, :]
 
 
 # fem()
