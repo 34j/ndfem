@@ -170,7 +170,8 @@ def mesh_subentities[TArray: Array](simplex: TArray, d1_subentities: int, /) -> 
     simplex : TArray
         The indices of the vertices that form simplex of shape (n_simplex, d + 1).
     d1_subentities : int
-        The number of subentities in the simplex, e.g. 2 for triangles.
+        The number of subentities in the simplex.
+        Must be 0 <= d1_subentities <= d.
 
     Returns
     -------
@@ -179,9 +180,14 @@ def mesh_subentities[TArray: Array](simplex: TArray, d1_subentities: int, /) -> 
 
     """
     xp = array_namespace(simplex)
+    d = simplex.shape[-1] - 1
+    if not (0 <= d1_subentities <= d):
+        raise ValueError(
+            f"d1_subentities must be in [0, {d=}], got {d1_subentities}."
+        )
     # (n_comb, d1_subentities + 1)
     comb = xp.asarray(
-        list(combinations(range(simplex.shape[1]), d1_subentities + 1)),
+        list(combinations(range(d + 1), d1_subentities + 1)),
         dtype=xp.int16,
     )
     # (n_simplex, n_comb, d1_subentities + 1)

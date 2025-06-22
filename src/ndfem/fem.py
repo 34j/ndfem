@@ -5,7 +5,7 @@ import attrs
 import quadpy
 from array_api._2024_12 import Array, ArrayNamespace
 from array_api_compat import array_namespace
-
+from .mesh import mesh_subentities
 from .simplex import (
     all_simplex_permutations,
     barycentric_to_cartesian,
@@ -406,8 +406,12 @@ def fem[TArray: Array, TBC: str](
     """
     # (n_simplex, d, d + 1)
     d = simplex.shape[-1] - 1
+    n_vertices = vertices.shape[0]
+    n_simplex = simplex.shape[0]
+    xp = array_namespace(vertices, simplex)
     simplex_vertices = vertices[simplex, :]
     scheme = quadpy.tn.grundmann_moeller(d, 2)
+    n_points = scheme.points.shape[1]
     bilinear_data = BilinearData(
         element=element,
         simplex_vertices=simplex_vertices,
@@ -416,5 +420,19 @@ def fem[TArray: Array, TBC: str](
     # (n_points, n_simplex, n_basis_u, n_basis_v)
     bilinear = bilinear_form(bilinear_data)
     linear = linear_form(bilinear_data)
-    print(bilinear.shape, linear.shape)
-    print(get_basis_info(element, d))
+    if bilinear.shape[0] not in {1, n_points} or bilinear.shape[1] not in {1, n_simplex}:
+        raise ValueError(
+            f"Expected bilinear form to have shape (n_points={n_points}, n_simplex={n_simplex}, "
+            f"n_basis_u, n_basis_v), got {bilinear.shape=}"
+        )
+    if linear.shape[0] not in {1, n_points} or linear.shape[1] not in {1, n_simplex}:
+        raise ValueError(
+            f"Expected linear form to have shape (n_points={n_points}, n_simplex={n_simplex}), "
+            f"got {linear.shape=}"
+        )
+    subentities = {
+        d1_subentities: mesh_subentities(simplex, d1_subentities)
+        for d1_subentities in range(0, d + 1)
+    }
+    for subentity_vertices in get_basis_info(element, d):
+        print(subentity_vertices)
