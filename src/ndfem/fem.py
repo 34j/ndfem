@@ -144,8 +144,8 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
                 return None
         elif derv == 1:
             if d1_subentity == 0:
-                return -xp.ones((self.d + 1, 1), dtype=x.dtype, device=x.device)[
-                    (None,) * (x.ndim - 1), ...
+                return -xp.ones((self.d, 1), dtype=x.dtype, device=x.device)[
+                    (None,) * (x.ndim - 1) + (...,)
                 ]
             else:
                 return None
@@ -180,7 +180,7 @@ def transform_derivatives[TArray: Array](
     funcs : TArray
         The basis functions evaluated of shape (..., *derv_shape, n_basis_n).
     simplex_vertices : TArray
-        The vertices of the simplex of shape (n_simplex, d, d + 1).
+        The vertices of the simplex of shape (n_simplex, d + 1, d).
     derv : int
         The derivative order of the basis functions to evaluate.
 
@@ -192,7 +192,8 @@ def transform_derivatives[TArray: Array](
 
     """
     xp = array_namespace(simplex_vertices)
-    jaccobian = simplex_vertices[:, :, 1:] - simplex_vertices[:, :, 0:1]
+    jaccobian = simplex_vertices[:, 1:, :] - simplex_vertices[:, 0:1, :]
+    print(jaccobian.shape, funcs.shape)
     return funcs @ xp.linalg.matrix_power(jaccobian, derv)
 
 
@@ -235,8 +236,14 @@ def evaluate_basis[TArray: Array](
         x_reference = barycentric_to_cartesian(x_barycentric[..., permutations], simplex)
         # (n_points, d1Cd_subentity+1, *derv, n_basis_d1_subentity)
         value = element(x_reference, d1_subentity, derv)
-        if value is None:
+        if value is None or value.shape[-1] == 0:
             continue
+        if not xp.all(xp.asarray(value.shape[-1 - derv : -1]) == (d1 - 1)):
+            raise ValueError(
+                "Element must return basis functions "
+                f"with shape (...={x_reference.shape[:2]}, *derv_shape={(d1 - 1,) * derv}, n_basis_n), "
+                f"got {value.shape=}"
+            )
         value = xp.moveaxis(value, 1, -1)
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
@@ -264,7 +271,7 @@ def evaluate_basis_and_transform_derivatives[TArray: Array](
         The barycentric coordinates of the points to evaluate the basis functions at,
         of shape (..., n_points, d + 1).
     simplex_vertices : TArray
-        The vertices of the simplex of shape (n_simplex, d, d + 1).
+        The vertices of the simplex of shape (n_simplex, d + 1, d).
     derv : int
         The derivative order of the basis functions to evaluate.
 
@@ -276,7 +283,7 @@ def evaluate_basis_and_transform_derivatives[TArray: Array](
 
     """
     funcs = evaluate_basis(element, x_barycentric, derv)
-    return transform_derivatives(funcs[0], simplex_vertices, derv)
+    return transform_derivatives(funcs[1], simplex_vertices, derv)
 
 
 @attrs.frozen(kw_only=True)
@@ -284,6 +291,7 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](BilinearDataProtoco
     """Data used for bilinear form evaluation."""
 
     element: TElement
+    """The finite element to use for the bilinear form."""
     simplex_vertices: TArray
     """The vertices of the mesh of shape (n_vertices, d, d + 1)."""
     x_barycentric: TArray
@@ -310,7 +318,7 @@ def fem[TArray: Array, TBC: str](
     simplex: TArray,
     bilinear_form: Callable[[BilinearDataProtocol[TArray]], TArray],
     linear_form: Callable[[DataProtocol[TArray]], TArray],
-    element: ElementProtocol[TArray, TBC] | None = None,
+    element: ElementProtocol[TArray, TBC],
     # essential_bc: Mapping[TBC, TArray] | None = None,
 ) -> TArray:
     """
@@ -326,7 +334,7 @@ def fem[TArray: Array, TBC: str](
         The bilinear form to be integrated over simplex.
     linear_form : Callable[[Data[TArray]], TArray]
         The linear form to be integrated over simplex.
-    element : ElementProtocol[TArray, TBC] | None
+    element : ElementProtocol[TArray, TBC]
         The element to use for the finite element method.
 
     """
@@ -337,7 +345,8 @@ def fem[TArray: Array, TBC: str](
     bilinear_data = BilinearData(
         element=element,
         simplex_vertices=simplex_vertices,
-        x_barycentric=scheme.points,
+        x_barycentric=scheme.points.T,
     )
     bilinear = bilinear_form(bilinear_data)
     linear = linear_form(bilinear_data)
+    print(bilinear.shape, linear.shape)
