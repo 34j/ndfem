@@ -71,8 +71,9 @@ def cartesian_to_barycentric[TArray: Array](
 
 
 def reference_simplex[TArray: Array](
-    n: int,
+    d: int,
     /,
+    *,
     xp: ArrayNamespace[TArray, Any, Any] = np,
     dtype: Any = None,
     device: Any = None,
@@ -83,10 +84,15 @@ def reference_simplex[TArray: Array](
 
     Parameters
     ----------
-    n : int
+    d : int
         The dimension of the simplex.
-    ref : TArray
-        The reference array to call `array_namespace` on.
+    xp : ArrayNamespace, optional
+        The array namespace to use, by default numpy.
+    dtype : Any, optional
+        The data type of the output array, by default None.
+    device : Any, optional
+        The device to use for the output array, by default None.
+
 
     Returns
     -------
@@ -97,8 +103,8 @@ def reference_simplex[TArray: Array](
     """
     simplex = xp.concat(
         (
-            xp.zeros((1, n), dtype=dtype, device=device),
-            xp.eye(n, dtype=dtype, device=device),
+            xp.zeros((1, d), dtype=dtype, device=device),
+            xp.eye(d, dtype=dtype, device=device),
         ),
         axis=0,
     )

@@ -31,8 +31,12 @@ class MeshProtocol[TArray: Array](Protocol):
 
 @attrs.frozen(kw_only=True)
 class Mesh[TArray: Array](MeshProtocol[TArray]):
+    """Simplical mesh."""
+
     vertices: TArray
+    """The vertices of the mesh of shape (n_vertices, d)."""
     simplex: TArray
+    """The indices of the vertices that form simplex of shape (n_simplex, d + 1)."""
 
     def __attrs_post_init__(self) -> None:
         if self.vertices.ndim != 2:
@@ -41,13 +45,12 @@ class Mesh[TArray: Array](MeshProtocol[TArray]):
             raise ValueError("Simplex must be a 2D array.")
         if self.simplex.shape[1] != self.vertices.shape[1] + 1:
             raise ValueError(
-                f"simplex.shape[1]={self.simplex.shape[1]} != vertices.shape[1]={self.vertices.shape[1]} + 1"
+                f"simplex.shape[1]={self.simplex.shape[1]} "
+                f"!= vertices.shape[1]={self.vertices.shape[1]} + 1"
             )
 
 
-def traiangulate_cube[TArray: Array](
-    n: int, /, *, stride: TArray | None = None
-) -> TArray:
+def traiangulate_cube[TArray: Array](n: int, /, *, stride: TArray | None = None) -> TArray:
     """
     Triangulate hypercube [0, 1]^n into n! simplexes.
 
@@ -67,10 +70,12 @@ def traiangulate_cube[TArray: Array](
     Array
         The vertice numbers of the simplexes in the triangulation of shape (n!, n).
 
-        The first axis corresponds to the simplex number, the second axis corresponds to the vertex number.
+        The first axis corresponds to the simplex number,
+        the second axis corresponds to the vertex number.
 
         The vertice numbers are ordered lexicographically,
-        e.g. 0 -> (0, ..., 0), 1 -> (0, ..., 1), 2 -> (0, ..., 1, 0), 3 -> (0, ..., 1, 1), ...
+        e.g. 0 -> (0, ..., 0), 1 -> (0, ..., 1),
+        2 -> (0, ..., 1, 0), 3 -> (0, ..., 1, 1), ...
         2^n - 1 -> (1, ..., 1).
 
         Since the simplexes are surrounded by n + 1 planes, which are
@@ -90,6 +95,22 @@ def traiangulate_cube[TArray: Array](
 
 
 def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TArray]:
+    """
+    Create a cuboid mesh.
+
+    Returns
+    -------
+    lengths : TArray
+        The lengths of the cuboid in each dimension.
+    units : TArray
+        The mesh lengths in each dimension.
+
+    Returns
+    -------
+    MeshProtocol[TArray]
+        The mesh of the cuboid with vertices and simplexes.
+
+    """
     xp = array_namespace(lengths, units)
     lengths, units = xp.broadcast_arrays(lengths, units)
     if lengths.ndim != 1:
@@ -101,7 +122,7 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
             xp.meshgrid(
                 *[
                     xp.linspace(0, length, num=num + 1)
-                    for length, num in zip(lengths, nums)
+                    for length, num in zip(lengths, nums, strict=False)
                 ],
                 indexing="ij",
             )

@@ -1,7 +1,8 @@
-from collections.abc import Mapping, Sequence
-from typing import Any, Callable, Literal, Protocol
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Literal, Protocol
 
 import attrs
+import quadpy
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
 
@@ -13,6 +14,8 @@ from .simplex import (
 
 
 class DataProtocol[TArray: Array](Protocol):
+    """A protocol for data used when evaluating linear form."""
+
     def v(self, derv: int) -> TArray:
         """
         Returns the basis functions evaluated at x for a polynomial of degree k.
@@ -31,10 +34,14 @@ class DataProtocol[TArray: Array](Protocol):
         ...
 
     @property
-    def x(self) -> TArray: ...
+    def x(self) -> TArray:
+        """The points at which the basis functions are evaluated."""
+        ...
 
 
 class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
+    """A protocol for data used when evaluating bilinear form."""
+
     def u(self, derv: int) -> TArray:
         """
         Returns the basis functions evaluated at x for a polynomial of degree k.
@@ -54,6 +61,8 @@ class BilinearDataProtocol[TArray: Array](DataProtocol[TArray], Protocol):
 
 
 class ElementProtocol[TArray: Array, TBC: str](Protocol):
+    """A protocol for finite element basis functions."""
+
     def __call__(self, x: TArray, d1_subentity: int, derv: int, /) -> TArray | None:
         """
         Evaluate the element at x with derivatives specified by derv.
@@ -66,7 +75,7 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         ----------
         x : TArray
             The points at which to evaluate the element of shape (..., n).
-        subentity : int
+        d1_subentity : int
             The subentity number.
             The basis functions belong to the d1-subentity of the simplex.
             The basis functions are shared among other simplexes which
@@ -115,22 +124,22 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
 
 @attrs.frozen(kw_only=True)
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
+    """n-dimensional P1 element with bubble function (optional)."""
+
     d: int
     bubble: bool = False
 
-    def __call__(self, x: TArray, d1_subentity: int, derv: int, /) -> TArray | None:
+    def __call__(self, x: TArray, d1_subentity: int, derv: int, /) -> TArray | None:  # noqa: D102
         xp = array_namespace(x)
         if x.shape[-1] != self.d:
-            raise ValueError(
-                f"Expected last dimension of x to be {self.d=}, got {x.shape[-1]=}."
-            )
+            raise ValueError(f"Expected last dimension of x to be {self.d=}, got {x.shape[-1]=}.")
         if derv == 0:
             if d1_subentity == 0:
                 return (1 - xp.sum(x, axis=-1))[..., None]
             if d1_subentity == self.d and self.bubble:
-                return (
-                    (self.d**self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1))
-                )[..., None]
+                return ((self.d**self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[
+                    ..., None
+                ]
             else:
                 return None
         elif derv == 1:
@@ -143,9 +152,7 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         else:
             raise ValueError(f"Unsupported derivative order {derv} for P1Element.")
 
-    def essentical_bc(
-        self, bc: Mapping[Literal["dirichelet"], TArray]
-    ) -> TArray | None:
+    def essentical_bc(self, bc: Mapping[Literal["dirichelet"], TArray]) -> TArray | None:  # noqa: D102
         if bc.keys() != {"dirichelet"}:
             raise ValueError("Only 'dirichelet' boundary condition is supported.")
         if "dirichelet" not in bc:
@@ -209,7 +216,7 @@ def evaluate_basis[TArray: Array](
 
     Returns
     -------
-    TArray
+    Sequence[Sequence[int]]
         Sequence of (d_subentity_vertices)
     TArray
         The basis functions evaluated at the barycentric coordinates,
@@ -219,12 +226,13 @@ def evaluate_basis[TArray: Array](
     xp = array_namespace(x_barycentric)
     d1 = x_barycentric.shape[-1]
     simplex = reference_simplex(d1 - 1)
+    indices = []
     results = []
     for d1_subentity in range(d1):
         # (d1Cd_subentity+1, d+1)
-        permutation = all_simplex_permutations(d1, d1_subentity)
+        permutations = all_simplex_permutations(d1, d1_subentity)
         # (n_points, d1Cd_subentity+1, d)
-        x_reference = barycentric_to_cartesian(x_barycentric[..., permutation], simplex)
+        x_reference = barycentric_to_cartesian(x_barycentric[..., permutations], simplex)
         # (n_points, d1Cd_subentity+1, *derv, n_basis_d1_subentity)
         value = element(x_reference, d1_subentity, derv)
         if value is None:
@@ -232,7 +240,10 @@ def evaluate_basis[TArray: Array](
         value = xp.moveaxis(value, 1, -1)
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
-    return xp.concat(results, axis=-1)
+        for perm in permutations:
+            for _ in range(value.shape[-1]):
+                indices.append(perm)
+    return indices, xp.concat(results, axis=-1)
 
 
 def evaluate_basis_and_transform_derivatives[TArray: Array](
@@ -265,13 +276,13 @@ def evaluate_basis_and_transform_derivatives[TArray: Array](
 
     """
     funcs = evaluate_basis(element, x_barycentric, derv)
-    return transform_derivatives(funcs, simplex_vertices, derv)
+    return transform_derivatives(funcs[0], simplex_vertices, derv)
 
 
 @attrs.frozen(kw_only=True)
-class BilinearData[TArray: Array, TElement: ElementProtocol](
-    BilinearDataProtocol[TArray]
-):
+class BilinearData[TArray: Array, TElement: ElementProtocol](BilinearDataProtocol[TArray]):
+    """Data used for bilinear form evaluation."""
+
     element: TElement
     simplex_vertices: TArray
     """The vertices of the mesh of shape (n_vertices, d, d + 1)."""
@@ -279,7 +290,7 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](
     """The integration points in barycentric coordinates of shape (n_points, d + 1)."""
 
     @property
-    def x(self) -> TArray:
+    def x(self) -> TArray:  # noqa: D102
         return barycentric_to_cartesian(self.x_barycentric, self.simplex_vertices)
 
     def _funcs(self, derv: int) -> TArray:
@@ -287,10 +298,10 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](
             self.element, self.x_barycentric, self.simplex_vertices, derv
         )
 
-    def v(self, derv: int) -> TArray:
+    def v(self, derv: int) -> TArray:  # noqa: D102
         return self._funcs(derv)[None, :]
 
-    def u(self, derv: int) -> TArray:
+    def u(self, derv: int) -> TArray:  # noqa: D102
         return self._funcs(derv)[:, None]
 
 
@@ -315,17 +326,18 @@ def fem[TArray: Array, TBC: str](
         The bilinear form to be integrated over simplex.
     linear_form : Callable[[Data[TArray]], TArray]
         The linear form to be integrated over simplex.
+    element : ElementProtocol[TArray, TBC] | None
+        The element to use for the finite element method.
 
     """
     # (n_simplex, d, d + 1)
-    vertices[simplex, :]
-
-
-# fem()
-
-
-import quadpy
-
-scheme = quadpy.tn.grundmann_moeller(3, 2)
-# scheme = quadpy.tn.stroud_1969(3)
-print(scheme.weights.shape, scheme.points.shape)
+    d = simplex.shape[-1] - 1
+    simplex_vertices = vertices[simplex, :]
+    scheme = quadpy.tn.grundmann_moeller(d, 2)
+    bilinear_data = BilinearData(
+        element=element,
+        simplex_vertices=simplex_vertices,
+        x_barycentric=scheme.points,
+    )
+    bilinear = bilinear_form(bilinear_data)
+    linear = linear_form(bilinear_data)
