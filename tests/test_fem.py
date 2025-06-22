@@ -21,7 +21,7 @@ def test_laplace() -> None:
         gradu = d.u(1)
         gradv = d.v(1)
         xp = array_namespace(gradu, gradv)
-        return xp.tensordot(gradu, gradv, axes=-2)
+        return xp.vecdot(gradu, gradv, axis=-1)
 
     def linear_form[TArray: Array](d: DataProtocol[TArray]) -> TArray:
         return d.v(0)
