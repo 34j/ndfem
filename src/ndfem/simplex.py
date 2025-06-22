@@ -106,7 +106,7 @@ def reference_simplex[TArray: Array](
 
 
 def all_simplex_permutations[TArray: Array](
-    n: int, d_subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np
+    n: int, d1_subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np
 ) -> TArray:
     """
     All permutations for subentities.
@@ -125,8 +125,8 @@ def all_simplex_permutations[TArray: Array](
 
     """
     result = []
-    vertices = np.arange(n)
-    for comb in combinations(vertices, d_subentities):
+    vertices = xp.arange(n)
+    for comb in combinations(vertices, d1_subentities + 1):
         line = list(comb) + list(set(vertices) - set(comb))
         result.append(line)
-    return np.asarray(result)
+    return xp.asarray(result)

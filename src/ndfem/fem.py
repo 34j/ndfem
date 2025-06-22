@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Callable, Literal, Protocol
+from typing import Any, Callable, Literal, Protocol
 
 import attrs
 from array_api._2024_12 import Array
@@ -116,6 +116,7 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
 @attrs.frozen(kw_only=True)
 class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
     n: int
+    bubble: bool = False
 
     def __call__(self, x: TArray, d_subentity: int, derv: int, /) -> TArray | None:
         xp = array_namespace(x)
@@ -126,6 +127,8 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         if derv == 0:
             if d_subentity == 0:
                 return (1 - xp.sum(x, axis=-1))[..., None]
+            if d_subentity == self.n and self.bubble:
+                return ((self.n ** self.n) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[..., None]
             else:
                 return None
         elif derv == 1:
@@ -175,7 +178,7 @@ def funcs_to_general[TArray: Array](
 
 
 def evaluate_basis[TArray: Array](
-    element: ElementProtocol[TArray, str],
+    element: ElementProtocol[TArray, Any],
     x_barycentric: TArray,
     derv: int,
 ) -> TArray:
@@ -184,7 +187,7 @@ def evaluate_basis[TArray: Array](
 
     Parameters
     ----------
-    element : ElementProtocol[TArray, str]
+    element : ElementProtocol[TArray, Any]
         The element to evaluate the basis functions for.
     x_barycentric : TArray
         The barycentric coordinates of the points to evaluate the basis functions at,
@@ -200,14 +203,21 @@ def evaluate_basis[TArray: Array](
 
     """
     xp = array_namespace(x_barycentric)
-    n = x_barycentric.shape[-1]
-    simplex = reference_simplex(n)
+    d1 = x_barycentric.shape[-1]
+    simplex = reference_simplex(d1 - 1)
     results = []
-    for d_subentity in range(n):
-        # (d+1Cd_subentity, d+1)
-        permutation = all_simplex_permutations(n, d_subentity)
+    for d1_subentity in range(d1):
+        # (d1Cd_subentity+1, d+1)
+        permutation = all_simplex_permutations(d1, d1_subentity)
+        # (n_points, d1Cd_subentity+1, d)
         x_reference = barycentric_to_cartesian(x_barycentric[..., permutation], simplex)
-        results.append(element(x_reference, d_subentity, derv))
+        # (n_points, d1Cd_subentity+1, *derv, n_basis_d1_subentity)
+        value = element(x_reference, d1_subentity, derv)
+        if value is None:
+            continue
+        value = xp.moveaxis(value, 1, -1)
+        value = xp.reshape(value, (*value.shape[:-2], -1))
+        results.append(value)
     return xp.concat(results, axis=-1)
 
 
