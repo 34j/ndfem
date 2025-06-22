@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Callable, Literal, Protocol
 
 import attrs
@@ -128,7 +128,9 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
             if d1_subentity == 0:
                 return (1 - xp.sum(x, axis=-1))[..., None]
             if d1_subentity == self.d and self.bubble:
-                return ((self.d ** self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[..., None]
+                return (
+                    (self.d**self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1))
+                )[..., None]
             else:
                 return None
         elif derv == 1:
@@ -174,7 +176,7 @@ def transform_derivatives[TArray: Array](
         The vertices of the simplex of shape (n_simplex, d, d + 1).
     derv : int
         The derivative order of the basis functions to evaluate.
-        
+
     Returns
     -------
     TArray
@@ -191,7 +193,7 @@ def evaluate_basis[TArray: Array](
     element: ElementProtocol[TArray, Any],
     x_barycentric: TArray,
     derv: int,
-) -> TArray:
+) -> tuple[Sequence[Sequence[int]], TArray]:
     """
     Evaluate the basis functions at the given barycentric coordinates.
 
@@ -207,6 +209,8 @@ def evaluate_basis[TArray: Array](
 
     Returns
     -------
+    TArray
+        Sequence of (d_subentity_vertices)
     TArray
         The basis functions evaluated at the barycentric coordinates,
         of shape (..., *derv_shape, sum_n_basis_n),
@@ -229,6 +233,7 @@ def evaluate_basis[TArray: Array](
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
     return xp.concat(results, axis=-1)
+
 
 def evaluate_basis_and_transform_derivatives[TArray: Array](
     element: ElementProtocol[TArray, Any],
@@ -261,6 +266,7 @@ def evaluate_basis_and_transform_derivatives[TArray: Array](
     """
     funcs = evaluate_basis(element, x_barycentric, derv)
     return transform_derivatives(funcs, simplex_vertices, derv)
+
 
 @attrs.frozen(kw_only=True)
 class BilinearData[TArray: Array, TElement: ElementProtocol](
@@ -312,7 +318,7 @@ def fem[TArray: Array, TBC: str](
 
     """
     # (n_simplex, d, d + 1)
-    simplex_vertices = vertices[simplex, :]
+    vertices[simplex, :]
 
 
 # fem()

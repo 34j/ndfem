@@ -1,3 +1,4 @@
+from itertools import combinations
 from typing import Protocol
 
 import attrs
@@ -139,7 +140,7 @@ def cuboid[TArray: Array](lengths: TArray, units: TArray, /) -> MeshProtocol[TAr
     return Mesh(vertices=vertices, simplex=simplexes)
 
 
-def simplex_planes[TArray: Array](simplex: TArray, /) -> TArray:
+def mesh_subentities[TArray: Array](simplex: TArray, d1_subentities: int, /) -> TArray:
     """
     Convert a mesh to a triangle mesh.
 
@@ -147,6 +148,8 @@ def simplex_planes[TArray: Array](simplex: TArray, /) -> TArray:
     ----------
     simplex : TArray
         The indices of the vertices that form simplex of shape (n_simplex, d + 1).
+    d1_subentities : int
+        The number of subentities in the simplex, e.g. 2 for triangles.
 
     Returns
     -------
@@ -155,10 +158,16 @@ def simplex_planes[TArray: Array](simplex: TArray, /) -> TArray:
 
     """
     xp = array_namespace(simplex)
-    d = simplex.shape[1] - 1
-    simplex_planes = simplex[
-        :, (xp.arange(d + 1)[:, None] + xp.arange(d)[None, :]) % (d + 1)
-    ]
-    simplex_planes = xp.reshape(simplex_planes, (-1, d))
-    simplex_planes = np.unique(simplex_planes, axis=0)
-    return simplex_planes
+    n = simplex.shape[1] - 1
+    # (n_comb, d1_subentities + 1)
+    comb = xp.asarray(
+        list(combinations(xp.arange(n, dtype=xp.int16), d1_subentities + 1)),
+        dtype=xp.int16,
+    )
+    # (n_simplex, n_comb, d1_subentities + 1)
+    subentities = simplex[:, comb]
+    # (n_simplex * n_comb, d1_subentities + 1)
+    subentities = xp.reshape(subentities, (-1, subentities.shape[-1]))
+    subentities = xp.sort(subentities, axis=1)
+    subentities = xp.unique(subentities, axis=0)
+    return subentities

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
 
-from ndfem.mesh import cuboid, simplex_planes, traiangulate_cube
+from ndfem.mesh import cuboid, mesh_subentities, traiangulate_cube
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -20,6 +20,6 @@ def test_traiangulate():
 
 def test_cuboid():
     actual = cuboid(np.asarray([2, 2, 1]), 1)
-    meshio.Mesh(actual.vertices, {"triangle": simplex_planes(actual.simplex)}).write(
-        "tests/.cache/cuboid.obj"
-    )
+    meshio.Mesh(
+        actual.vertices, {"triangle": mesh_subentities(actual.simplex, 2)}
+    ).write("tests/.cache/cuboid.obj")
