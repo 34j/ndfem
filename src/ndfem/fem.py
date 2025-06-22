@@ -418,21 +418,25 @@ def fem[TArray: Array, TBC: str](
         x_barycentric=scheme.points.T,
     )
     # (n_points, n_simplex, n_basis_u, n_basis_v)
-    bilinear = bilinear_form(bilinear_data)
-    linear = linear_form(bilinear_data)
-    if bilinear.shape[0] not in {1, n_points} or bilinear.shape[1] not in {1, n_simplex}:
+    bilinear_val = bilinear_form(bilinear_data)
+    linear_val = linear_form(bilinear_data)
+    if bilinear_val.shape[0] not in {1, n_points} or bilinear_val.shape[1] not in {1, n_simplex}:
         raise ValueError(
             f"Expected bilinear form to have shape (n_points={n_points}, n_simplex={n_simplex}, "
-            f"n_basis_u, n_basis_v), got {bilinear.shape=}"
+            f"n_basis_u, n_basis_v), got {bilinear_val.shape=}"
         )
-    if linear.shape[0] not in {1, n_points} or linear.shape[1] not in {1, n_simplex}:
+    if linear_val.shape[0] not in {1, n_points} or linear_val.shape[1] not in {1, n_simplex}:
         raise ValueError(
             f"Expected linear form to have shape (n_points={n_points}, n_simplex={n_simplex}), "
-            f"got {linear.shape=}"
+            f"got {linear_val.shape=}"
         )
+    # (n_simplex, n_basis_u, n_basis_v)
+    bilinear = xp.vecdot(scheme.weights, bilinear_val, axis=0)
+    linear = xp.vecdot(scheme.weights, linear_val, axis=0)
     subentities = {
         d1_subentities: mesh_subentities(simplex, d1_subentities)
         for d1_subentities in range(0, d + 1)
     }
-    for subentity_vertices in get_basis_info(element, d):
+    for subentity_vertices_i in get_basis_info(element, d):
+        subentity_vertices = simplex[:, subentity_vertices_i]
         print(subentity_vertices)

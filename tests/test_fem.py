@@ -15,7 +15,7 @@ def test_p1_element() -> None:
 
 def test_laplace() -> None:
     element = P1Element(d=2, bubble=False)
-    mesh = cuboid(np.array([10, 10]), np.array(1))
+    mesh = cuboid(np.array([3, 3]), np.array(1))
 
     def bilinear_form[TArray: Array](d: BilinearDataProtocol[TArray]) -> TArray:
         gradu = d.u(1)
