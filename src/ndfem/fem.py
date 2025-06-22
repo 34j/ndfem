@@ -284,7 +284,7 @@ def evaluate_basis[TArray: Array](
         results.append(value)
         for perm in permutations:
             for _ in range(n_basis_d1_subentity):
-                indices.append(perm)
+                indices.append(perm[:d1_subentity + 1])
     return indices, xp.concat(results, axis=-1)
 
 def get_basis_info[TArray: Array](element: ElementProtocol[TArray, Any], d: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> Sequence[Sequence[int]]:
@@ -438,5 +438,6 @@ def fem[TArray: Array, TBC: str](
         for d1_subentities in range(0, d + 1)
     }
     for subentity_vertices_i in get_basis_info(element, d):
+        print(subentity_vertices_i)
         subentity_vertices = simplex[:, subentity_vertices_i]
         print(subentity_vertices)
