@@ -255,7 +255,7 @@ def evaluate_basis[TArray: Array](
         x_barycentric_perm = x_barycentric[..., permutations]
         # (..., d1Cd_subentity+1, d)
         x_reference = barycentric_to_cartesian(x_barycentric_perm, simplex)
-        # (n_points, d1Cd_subentity+1, *derv, n_basis_d1_subentity)
+        # (..., d1Cd_subentity+1, *derv, n_basis_d1_subentity)
         value = element(x_reference, d1_subentity, derv)
         if value is None or value.shape[-1] == 0:
             continue
@@ -271,7 +271,7 @@ def evaluate_basis[TArray: Array](
                 f"with shape (...={x_reference.shape[:2]}, *derv_shape={(d1 - 1,) * derv}, n_basis_n), "
                 f"got {value.shape=}"
             )
-        value = xp.broadcast_to(value, (*x_barycentric.shape[:2], *value.shape[-2:]))
+        value = xp.broadcast_to(value, (*x_barycentric.shape[:2], *value.shape[2:]))
         value = xp.moveaxis(value, 1, -1)
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
