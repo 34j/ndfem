@@ -1,8 +1,9 @@
+from itertools import combinations
 from typing import Any
+
+import numpy as np
 from array_api._2024_12 import Array, ArrayNamespace
 from array_api_compat import array_namespace
-import numpy as np
-from itertools import combinations
 
 
 def barycentric_to_cartesian[TArray: Array](
@@ -69,7 +70,13 @@ def cartesian_to_barycentric[TArray: Array](
     return xp.linalg.solve(simplex.T, x.T).T
 
 
-def reference_simplex[TArray: Array](n: int, /, xp: ArrayNamespace[TArray, Any, Any] = np, dtype: Any = None, device: Any = None) -> TArray:
+def reference_simplex[TArray: Array](
+    n: int,
+    /,
+    xp: ArrayNamespace[TArray, Any, Any] = np,
+    dtype: Any = None,
+    device: Any = None,
+) -> TArray:
     """
     Transform the points `x` from the general simplex to the barycentric coordinates
     of the reference simplex.
@@ -98,24 +105,28 @@ def reference_simplex[TArray: Array](n: int, /, xp: ArrayNamespace[TArray, Any, 
     return simplex
 
 
-def all_rotated_simplex[TArray: Array](n: int, n_subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> TArray:
-    """All permutations for subentities.
+def all_simplex_permutations[TArray: Array](
+    n: int, d_subentities: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np
+) -> TArray:
+    """
+    All permutations for subentities.
 
     Returns
     -------
     TArray
         All combinations of subentities in the simplex of shape (nCn_subentities, n).
-        
+
     Examples
     --------
     >>> from ndfem.simplex import all_rotated_simplex
     >>> all_rotated_simplex(3, 2)
     array([[0, 1, 2], [0, 2, 1], [1, 2, 0]])
             ----       ----       ----
+
     """
     result = []
     vertices = np.arange(n)
-    for comb in combinations(vertices, n_subentities):
+    for comb in combinations(vertices, d_subentities):
         line = list(comb) + list(set(vertices) - set(comb))
         result.append(line)
     return np.asarray(result)

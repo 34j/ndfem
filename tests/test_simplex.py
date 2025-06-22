@@ -3,16 +3,16 @@ import pytest
 from numpy.testing import assert_allclose
 
 from ndfem.simplex import (
+    all_simplex_permutations,
     barycentric_to_cartesian,
     cartesian_to_barycentric,
     reference_simplex,
-    all_rotated_simplex
 )
 
 
 @pytest.mark.parametrize("n", [1, 4])
 def test_reference_simplex(n: int) -> None:
-    simplex = reference_simplex(n, ref=np.array(0))
+    simplex = reference_simplex(n)
     assert simplex.shape == (n + 1, n)
 
 
@@ -28,4 +28,4 @@ def test_simplex(n: int) -> None:
 
 @pytest.mark.parametrize("n", [1, 3])
 def test_rotated_simplex(n: int) -> None:
-    print(all_rotated_simplex(n, max(1, n-1)))
+    print(all_simplex_permutations(n, max(1, n - 1)))

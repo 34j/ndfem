@@ -5,7 +5,11 @@ import attrs
 from array_api._2024_12 import Array
 from array_api_compat import array_namespace
 
-from .simplex import barycentric_to_cartesian, reference_simplex
+from .simplex import (
+    all_simplex_permutations,
+    barycentric_to_cartesian,
+    reference_simplex,
+)
 
 
 class DataProtocol[TArray: Array](Protocol):
@@ -73,14 +77,14 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         Returns
         -------
         TArray
-            The basis functions evaluated at x 
+            The basis functions evaluated at x
             of shape (..., *derv_shape, n_basis_n),
             where derv_shape = (n,) * derv.
-            
+
             The basis functions must not be repeated
-            for each n-subentity but must be for 
+            for each n-subentity but must be for
             the first n-subentity in terms of lexicographic order.
-            
+
             The basis functions must be symmetric under
             permutation of the vertices of the n-subentity.
 
@@ -126,7 +130,9 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
                 return None
         elif derv == 1:
             if d_subentity == 0:
-                return -xp.ones((self.n + 1, 1), dtype=x.dtype, device=x.device)[(None,) * (x.ndim - 1), ...]
+                return -xp.ones((self.n + 1, 1), dtype=x.dtype, device=x.device)[
+                    (None,) * (x.ndim - 1), ...
+                ]
             else:
                 return None
         else:
@@ -150,17 +156,18 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
             res = res[res != dv[0]]
             return res.astype(xp.int64, device=dv.device)
 
+
 def funcs_to_general[TArray: Array](
-    funcs: TArray,
-    simplex_vertices: TArray,
-    derv: int
+    funcs: TArray, simplex_vertices: TArray, derv: int
 ) -> TArray:
-    """Convert the (derivatives of) basis functions to a general simplex.
+    """
+    Convert the (derivatives of) basis functions to a general simplex.
 
     Parameters
     ----------
     funcs : TArray
         The basis functions evaluated of shape (..., *derv_shape, n_basis_n).
+
     """
     xp = array_namespace(simplex_vertices)
     jaccobian = simplex_vertices[:, :, 1:] - simplex_vertices[:, :, 0:1]
@@ -172,10 +179,37 @@ def evaluate_basis[TArray: Array](
     x_barycentric: TArray,
     derv: int,
 ) -> TArray:
-    n = x_barycentric.shape[-1] - 1
+    """
+    Evaluate the basis functions at the given barycentric coordinates.
+
+    Parameters
+    ----------
+    element : ElementProtocol[TArray, str]
+        The element to evaluate the basis functions for.
+    x_barycentric : TArray
+        The barycentric coordinates of the points to evaluate the basis functions at,
+        of shape (..., n_points, d + 1).
+    derv : int
+        The derivative order of the basis functions to evaluate.
+
+    Returns
+    -------
+    TArray
+        The basis functions evaluated at the barycentric coordinates,
+        of shape (..., *derv_shape, n_basis_n),
+
+    """
+    xp = array_namespace(x_barycentric)
+    n = x_barycentric.shape[-1]
     simplex = reference_simplex(n)
-    x_reference = barycentric_to_cartesian(x_barycentric)
-    
+    results = []
+    for d_subentity in range(n):
+        # (d+1Cd_subentity, d+1)
+        permutation = all_simplex_permutations(n, d_subentity)
+        x_reference = barycentric_to_cartesian(x_barycentric[..., permutation], simplex)
+        results.append(element(x_reference, d_subentity, derv))
+    return xp.concat(results, axis=-1)
+
 
 @attrs.frozen(kw_only=True)
 class BilinearData[TArray: Array, TElement: ElementProtocol](
@@ -192,9 +226,8 @@ class BilinearData[TArray: Array, TElement: ElementProtocol](
         return barycentric_to_cartesian(self.x_barycentric, self.simplex_vertices)
 
     def _funcs(self, derv: int) -> TArray:
-        xp = array_namespace(self.x_barycentric, self.simplex_vertices)
-        funcs = self.element(self.x_barycentric, derv)[None, :]
-
+        array_namespace(self.x_barycentric, self.simplex_vertices)
+        self.element(self.x_barycentric, derv)[None, :]
 
     def v(self, derv: int) -> TArray:
         return self._funcs(derv)[None, :]
