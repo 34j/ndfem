@@ -8,4 +8,4 @@ from ndfem.simplex import cartesian_to_barycentric, reference_simplex
 def test_p1_element() -> None:
     element = P1Element(n=2, bubble=True)
     basis = evaluate_basis(element, np.array([[0,0,1],[0.1, 0.4, 0.5]]), 0)
-    assert_allclose(basis, [[0,0,1,0],[0.1, 0.4, 0.5, 0.5*0.1*0.4]])
+    assert_allclose(basis, [[0,0,1,0],[0.1, 0.4, 0.5, 2**2*0.5*0.1*0.4]])
