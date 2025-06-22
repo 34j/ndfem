@@ -136,7 +136,7 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
         if derv == 0:
             if d1_subentity == 0:
                 return (1 - xp.sum(x, axis=-1))[..., None]
-            if d1_subentity == self.d and self.bubble:
+            elif d1_subentity == self.d and self.bubble:
                 return ((self.d**self.d) * xp.prod(x, axis=-1) * (1 - xp.sum(x, axis=-1)))[
                     ..., None
                 ]
@@ -147,6 +147,14 @@ class P1Element[TArray: Array](ElementProtocol[TArray, Literal["dirichelet"]]):
                 return -xp.ones((self.d, 1), dtype=x.dtype, device=x.device)[
                     (None,) * (x.ndim - 1) + (...,)
                 ]
+            elif d1_subentity == self.d and self.bubble:
+                coef = self.d**self.d
+                idx = xp.arange(self.d, dtype=xp.int16)
+                d1 = xp.prod(x[..., idx[:, None] + idx[None, :-1]], axis=-1) * (
+                    1 - xp.sum(x, axis=-1)
+                )
+                d2 = xp.prod(x, axis=-1)[..., None] * -1
+                return coef * (d1 + d2)[..., None]
             else:
                 return None
         else:
@@ -193,8 +201,7 @@ def transform_derivatives[TArray: Array](
     """
     xp = array_namespace(simplex_vertices)
     jaccobian = simplex_vertices[:, 1:, :] - simplex_vertices[:, 0:1, :]
-    print(jaccobian.shape, funcs.shape)
-    return funcs @ xp.linalg.matrix_power(jaccobian, derv)
+    return xp.linalg.matrix_power(jaccobian, derv) @ funcs
 
 
 def evaluate_basis[TArray: Array](
@@ -211,7 +218,7 @@ def evaluate_basis[TArray: Array](
         The element to evaluate the basis functions for.
     x_barycentric : TArray
         The barycentric coordinates of the points to evaluate the basis functions at,
-        of shape (..., n_points, d + 1).
+        of shape (..., d + 1).
     derv : int
         The derivative order of the basis functions to evaluate.
 
@@ -232,18 +239,27 @@ def evaluate_basis[TArray: Array](
     for d1_subentity in range(d1):
         # (d1Cd_subentity+1, d+1)
         permutations = all_simplex_permutations(d1, d1_subentity)
-        # (n_points, d1Cd_subentity+1, d)
-        x_reference = barycentric_to_cartesian(x_barycentric[..., permutations], simplex)
+        # (..., d1Cd_subentity+1, d+1)
+        x_barycentric_perm = x_barycentric[..., permutations]
+        # (..., d1Cd_subentity+1, d)
+        x_reference = barycentric_to_cartesian(x_barycentric_perm, simplex)
         # (n_points, d1Cd_subentity+1, *derv, n_basis_d1_subentity)
         value = element(x_reference, d1_subentity, derv)
         if value is None or value.shape[-1] == 0:
             continue
-        if not xp.all(xp.asarray(value.shape[-1 - derv : -1]) == (d1 - 1)):
+        try:
+            xp.broadcast_shapes(x_reference.shape[:2], value.shape[:2])
+            if len(value.shape) != 3 + derv:
+                raise ValueError()
+            if not xp.all(xp.asarray(value.shape[-1 - derv : -1]) == (d1 - 1)):
+                raise ValueError()
+        except ValueError:
             raise ValueError(
                 "Element must return basis functions "
                 f"with shape (...={x_reference.shape[:2]}, *derv_shape={(d1 - 1,) * derv}, n_basis_n), "
                 f"got {value.shape=}"
             )
+        value = xp.broadcast_to(value, (*x_barycentric.shape[:2], *value.shape[-2:]))
         value = xp.moveaxis(value, 1, -1)
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
