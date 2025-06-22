@@ -87,8 +87,8 @@ class ElementProtocol[TArray: Array, TBC: str](Protocol):
         -------
         TArray
             The basis functions evaluated at x
-            of shape (..., *derv_shape, n_basis_n),
-            where derv_shape = (n,) * derv.
+            of shape (..., *derv_shape, n_basis_d1_subentity),
+            where derv_shape = (d,) * derv.
 
             The basis functions must not be repeated
             for each d1-subentity but must be for
@@ -186,7 +186,8 @@ def transform_derivatives[TArray: Array](
     Parameters
     ----------
     funcs : TArray
-        The basis functions evaluated of shape (..., *derv_shape, n_basis_n).
+        The basis functions evaluated of shape (..., *derv_shape, n_basis_d1_subentity),
+        where derv_shape = (d,) * derv.
     simplex_vertices : TArray
         The vertices of the simplex of shape (n_simplex, d + 1, d).
     derv : int
@@ -196,12 +197,22 @@ def transform_derivatives[TArray: Array](
     -------
     TArray
         The basis functions transformed to the general simplex,
-        of shape (..., *derv_shape, n_basis_n).
+        of shape (..., n_simplex, *derv_shape, n_basis_d1_subentity),
+        where derv_shape = (d,) * derv.
 
     """
     xp = array_namespace(simplex_vertices)
+    # (n_simplex, d, d)
     jaccobian = simplex_vertices[:, 1:, :] - simplex_vertices[:, 0:1, :]
-    return xp.linalg.matrix_power(jaccobian, derv) @ funcs
+    x_extra_ndim = funcs.ndim - 1 - derv
+    # (..., n_simplex, *derv_shape, d)
+    jaccobian = jaccobian[(None,) * x_extra_ndim + (slice(None),) + (None,) * (derv - 1) + (slice(None), slice(None))]
+    # (..., n_simplex, *derv_shape, n_basis)
+    funcs = funcs[..., None, (slice(None),) * (derv + 1)]
+    for _ in range(derv):
+        funcs = jaccobian @ funcs
+        funcs = xp.moveaxis(funcs, -2, -derv - 1)
+    return funcs
 
 
 def evaluate_basis[TArray: Array](
@@ -229,6 +240,7 @@ def evaluate_basis[TArray: Array](
     TArray
         The basis functions evaluated at the barycentric coordinates,
         of shape (..., *derv_shape, sum_n_basis_n),
+        where derv_shape = (d,) * derv.
 
     """
     xp = array_namespace(x_barycentric)
@@ -295,7 +307,8 @@ def evaluate_basis_and_transform_derivatives[TArray: Array](
     -------
     TArray
         The basis functions evaluated at the barycentric coordinates,
-        transformed to the general simplex, of shape (..., *derv_shape, n_basis_n).
+        transformed to the general simplex, of shape (..., *derv_shape, n_basis_n),
+        where derv_shape = (d,) * derv.
 
     """
     funcs = evaluate_basis(element, x_barycentric, derv)
