@@ -2,16 +2,18 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal, Protocol
 
 import attrs
+import numpy as np
 import quadpy
 from array_api._2024_12 import Array, ArrayNamespace
 from array_api_compat import array_namespace
+
 from .mesh import mesh_subentities
 from .simplex import (
     all_simplex_permutations,
     barycentric_to_cartesian,
     reference_simplex,
 )
-import numpy as np
+
 
 class DataProtocol[TArray: Array](Protocol):
     """A protocol for data used when evaluating linear form."""
@@ -284,10 +286,13 @@ def evaluate_basis[TArray: Array](
         results.append(value)
         for perm in permutations:
             for _ in range(n_basis_d1_subentity):
-                indices.append(perm[:d1_subentity + 1])
+                indices.append(perm[: d1_subentity + 1])
     return indices, xp.concat(results, axis=-1)
 
-def get_basis_info[TArray: Array](element: ElementProtocol[TArray, Any], d: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> Sequence[Sequence[int]]:
+
+def get_basis_info[TArray: Array](
+    element: ElementProtocol[TArray, Any], d: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np
+) -> Sequence[Sequence[int]]:
     """
     Get the basis information for the element.
 

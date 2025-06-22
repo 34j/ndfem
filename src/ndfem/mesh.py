@@ -182,9 +182,7 @@ def mesh_subentities[TArray: Array](simplex: TArray, d1_subentities: int, /) -> 
     xp = array_namespace(simplex)
     d = simplex.shape[-1] - 1
     if not (0 <= d1_subentities <= d):
-        raise ValueError(
-            f"d1_subentities must be in [0, {d=}], got {d1_subentities}."
-        )
+        raise ValueError(f"d1_subentities must be in [0, {d=}], got {d1_subentities}.")
     # (n_comb, d1_subentities + 1)
     comb = xp.asarray(
         list(combinations(range(d + 1), d1_subentities + 1)),
