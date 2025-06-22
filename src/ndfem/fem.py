@@ -3,7 +3,7 @@ from typing import Any, Literal, Protocol
 
 import attrs
 import quadpy
-from array_api._2024_12 import Array
+from array_api._2024_12 import Array, ArrayNamespace
 from array_api_compat import array_namespace
 
 from .simplex import (
@@ -11,7 +11,7 @@ from .simplex import (
     barycentric_to_cartesian,
     reference_simplex,
 )
-
+import numpy as np
 
 class DataProtocol[TArray: Array](Protocol):
     """A protocol for data used when evaluating linear form."""
@@ -258,7 +258,7 @@ def evaluate_basis[TArray: Array](
         x_barycentric_perm = x_barycentric[..., permutations]
         # (..., d1Cd_subentity+1, d)
         x_reference = barycentric_to_cartesian(x_barycentric_perm, simplex)
-        # (..., d1Cd_subentity+1, *derv, n_basis_d1_subentity)
+        # (... or 1, d1Cd_subentity+1 or 1, *derv, n_basis_d1_subentity)
         value = element(x_reference, d1_subentity, derv)
         if value is None or value.shape[-1] == 0:
             continue
@@ -274,14 +274,40 @@ def evaluate_basis[TArray: Array](
                 f"with shape (...={x_reference.shape[:2]}, *derv_shape={(d1 - 1,) * derv}, n_basis_n), "
                 f"got {value.shape=}"
             )
+        n_basis_d1_subentity = value.shape[-1]
+        # (..., d1Cd_subentity+1, *derv, n_basis_d1_subentity)
         value = xp.broadcast_to(value, (*x_barycentric.shape[:2], *value.shape[2:]))
+        # (..., *derv, d1Cd_subentity+1, n_basis_d1_subentity)
         value = xp.moveaxis(value, 1, -1)
+        # (..., *derv, d1Cd_subentity+1 * n_basis_d1_subentity)
         value = xp.reshape(value, (*value.shape[:-2], -1))
         results.append(value)
         for perm in permutations:
-            for _ in range(value.shape[-1]):
+            for _ in range(n_basis_d1_subentity):
                 indices.append(perm)
     return indices, xp.concat(results, axis=-1)
+
+def get_basis_info[TArray: Array](element: ElementProtocol[TArray, Any], d: int, /, *, xp: ArrayNamespace[TArray, Any, Any] = np) -> Sequence[Sequence[int]]:
+    """
+    Get the basis information for the element.
+
+    Parameters
+    ----------
+    element : ElementProtocol[TArray, Any]
+        The element to get the basis information for.
+    d : int
+        The dimension of the element.
+    xp : ArrayNamespace[TArray, Any, Any]
+        The array namespace to use for the element.
+
+    Returns
+    -------
+    Sequence[Sequence[int]]
+        Sequence of (d_subentity_vertices)
+
+    """
+    indices, _ = evaluate_basis(element, xp.zeros((1, d + 1)), 0)
+    return indices
 
 
 def evaluate_basis_and_transform_derivatives[TArray: Array](
@@ -391,3 +417,4 @@ def fem[TArray: Array, TBC: str](
     bilinear = bilinear_form(bilinear_data)
     linear = linear_form(bilinear_data)
     print(bilinear.shape, linear.shape)
+    print(get_basis_info(element, d))
