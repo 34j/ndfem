@@ -49,6 +49,10 @@ docs = [
 [tool.ruff]
 extend = ".venv/ruff.toml"
 
+[tool.ruff.lint]
+extend-per-file-ignores."docs/conf.py" = [ "A001", "D401" ]
+extend-per-file-ignores."tests/**/*" = [ "S404", "S603" ]
+
 [tool.pyproject-fmt]
 max_supported_python = "3.14"
 
