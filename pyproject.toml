@@ -9,7 +9,7 @@ description = "N-dimensional FEM for NumPy / PyTorch / JAX"
 readme = "README.md"
 license = "MIT"
 authors = [
-  { name = "34j", email = "34j.95a2p@simplelogin.com" },
+  { name = "34j" },
 ]
 requires-python = ">=3.12"
 classifiers = [
@@ -23,7 +23,6 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Libraries",
 ]
-
 dependencies = [
   "rich>=10",
   "typer>=0.15,<1",
@@ -48,10 +47,8 @@ docs = [
 
 [tool.ruff]
 extend = ".venv/ruff.toml"
-
-[tool.ruff.lint]
-extend-per-file-ignores."docs/conf.py" = [ "A001", "D401" ]
-extend-per-file-ignores."tests/**/*" = [ "S404", "S603" ]
+lint.extend-per-file-ignores."docs/conf.py" = [ "A001", "D401" ]
+lint.extend-per-file-ignores."tests/**/*" = [ "S404", "S603" ]
 
 [tool.pyproject-fmt]
 max_supported_python = "3.14"
@@ -59,82 +56,22 @@ max_supported_python = "3.14"
 [tool.ty]
 terminal.error-on-warning = true
 
-[tool.pytest.ini_options]
-addopts = """\
+[tool.pytest]
+ini_options.addopts = """\
     -v
     -Wdefault
     --cov=ndfem
     --cov-report=term
     --cov-report=xml
     """
-pythonpath = [ "src" ]
+ini_options.pythonpath = [ "src" ]
 
-[tool.coverage.run]
-branch = true
-
-[tool.coverage.report]
-exclude_lines = [
-  "pragma: no cover",
+[tool.coverage]
+run.branch = true
+report.exclude_lines = [
   "@overload",
-  "if TYPE_CHECKING",
-  "raise NotImplementedError",
   'if __name__ == "__main__":',
+  "if TYPE_CHECKING",
+  "pragma: no cover",
+  "raise NotImplementedError",
 ]
-
-[tool.mypy]
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-mypy_path = "src/"
-no_implicit_optional = true
-show_error_codes = true
-warn_unreachable = true
-warn_unused_ignores = true
-exclude = [
-  'docs/.*',
-  'setup.py',
-]
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-allow_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = "docs.*"
-ignore_errors = true
-
-[tool.semantic_release]
-version_toml = [ "pyproject.toml:project.version" ]
-version_variables = [
-  "src/ndfem/__init__.py:__version__",
-  "docs/conf.py:release",
-]
-build_command = """
-pip install uv
-uv lock
-git add uv.lock
-uv build
-"""
-
-[tool.semantic_release.changelog]
-exclude_commit_patterns = [
-  '''chore(?:\([^)]*?\))?: .+''',
-  '''ci(?:\([^)]*?\))?: .+''',
-  '''refactor(?:\([^)]*?\))?: .+''',
-  '''style(?:\([^)]*?\))?: .+''',
-  '''test(?:\([^)]*?\))?: .+''',
-  '''build\((?!deps\): .+)''',
-  '''Merged? .*''',
-  '''Initial [Cc]ommit.*''', # codespell:ignore
-]
-
-[tool.semantic_release.changelog.environment]
-keep_trailing_newline = true
-
-[tool.semantic_release.branches.main]
-match = "main"
-
-[tool.semantic_release.branches.noop]
-match = "(?!main$)"
-prerelease = true
